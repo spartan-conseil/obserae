@@ -1,0 +1,354 @@
+================================================================================
+CONTRAT DE LICENCE UTILISATEUR FINAL (EULA) - OBSERAE
+================================================================================
+
+Version 1.0 - 19/05/2026
+
+Editeur : Spartan Conseil Cybersecurite (ci-apres designee
+"Spartan Conseil", son nom commercial), SARL de droit francais.
+
+Contact licences commerciales : licensing@spartan-conseil.fr
+
+Le present contrat est redige en francais et en anglais (EULA.en.txt).
+EN CAS DE DIVERGENCE D'INTERPRETATION ENTRE LES DEUX VERSIONS, LA VERSION
+FRANCAISE PREVAUT.
+
+
+PREAMBULE
+---------
+
+Obserae est un logiciel de cybersecurite reseau (collecte et analyse de
+flux NetFlow, cartographie, detection) edite par Spartan Conseil. Il est
+distribue sous forme de binaires et d'images Docker proprietaires, dont
+le code source n'est pas rendu public.
+
+Spartan Conseil souhaite que le Logiciel soit librement accessible aux
+particuliers et aux tres petites structures, tout en reservant les usages
+professionnels d'envergure et les usages de revente de service a la
+conclusion d'un accord commercial. Le present EULA fixe les conditions
+de cette double mise a disposition.
+
+En telechargeant, installant ou utilisant le Logiciel, l'Utilisateur
+reconnait avoir pris connaissance du present contrat et l'accepter sans
+reserve.
+
+
+1. DEFINITIONS
+--------------
+
+Aux fins du present contrat :
+
+"Logiciel" designe Obserae, ses binaires, ses images Docker, sa
+documentation, ses mises a jour et tout composant fourni par Spartan
+Conseil sous la denomination "Obserae".
+
+"Utilisateur" designe la personne physique ou morale qui telecharge,
+installe, execute ou utilise le Logiciel.
+
+"Groupe Consolide" designe l'entite juridique qui exploite le Logiciel
+ainsi que ses societes meres, filiales et soeurs au sens des articles
+L233-1 et L233-3 du Code de commerce.
+
+"Personnes" designe l'ensemble des salaries, dirigeants, stagiaires,
+alternants, prestataires et sous-traitants intervenant plus de 30 jours
+calendaires par an au sein du Groupe Consolide.
+
+"Usage Personnel" designe l'usage du Logiciel par une personne physique
+agissant pour son propre compte, a des fins non commerciales.
+
+"Petite Entreprise Eligible" designe toute entite dont le Groupe
+Consolide compte au plus 20 (vingt) Personnes ET dont le chiffre
+d'affaires consolide du dernier exercice cloture est inferieur ou egal
+a 2 000 000 EUR (deux millions d'euros). Les deux criteres sont
+cumulatifs.
+
+"Usage Commercial" designe tout usage du Logiciel qui n'est ni un Usage
+Personnel, ni un usage interne par une Petite Entreprise Eligible.
+
+"Service Manage" designe toute offre dans le cadre de laquelle le
+Logiciel est exploite par un tiers pour le compte d'un client final,
+notamment les offres de type MSSP (Managed Security Service Provider),
+SOC-as-a-Service, hebergement managee ou supervision externalisee.
+
+
+2. CONCESSION DE LICENCE GRATUITE
+---------------------------------
+
+2.1. Spartan Conseil concede a l'Utilisateur une licence d'utilisation
+     gratuite, mondiale, non exclusive, non transferable et revocable,
+     pour :
+
+     a) tout Usage Personnel ;
+
+     b) tout usage interne par une Petite Entreprise Eligible.
+
+2.2. Cette licence couvre l'installation, l'execution, la configuration
+     et l'utilisation du Logiciel sur les infrastructures controlees par
+     l'Utilisateur, pour ses propres besoins.
+
+2.3. La licence est concedee pour la version telechargee du Logiciel et
+     ses mises a jour mineures publiees sous la meme version majeure.
+
+
+3. LICENCE COMMERCIALE REQUISE
+------------------------------
+
+La conclusion prealable d'un contrat de licence commercial avec Spartan
+Conseil est requise pour :
+
+a) tout usage par une entite ne remplissant PAS les criteres de Petite
+   Entreprise Eligible definis a l'article 1 ;
+
+b) toute fourniture du Logiciel en Service Manage ;
+
+c) toute utilisation du Logiciel dans le cadre d'une prestation de
+   service remuneree beneficiant a un tiers qui ne remplit pas les
+   criteres de Petite Entreprise Eligible (notamment audit, conseil,
+   integration, infogerance, formation chez un client au-dela du
+   seuil) ;
+
+d) toute vente de formation, certification ou prestation pedagogique
+   payante portant principalement ou exclusivement sur le Logiciel.
+
+Contact commercial : licensing@spartan-conseil.fr
+
+
+4. EXCEPTION - AUDIT PONCTUEL PAR CONSULTANT INDEPENDANT
+--------------------------------------------------------
+
+Par derogation a l'article 3 c), un consultant independant - lui-meme
+personne physique ou Petite Entreprise Eligible - peut deployer le
+Logiciel sur l'infrastructure d'un client au-dela du seuil dans le
+cadre exclusif d'un audit ponctuel, sous les conditions cumulatives
+suivantes :
+
+a) la duree du deploiement n'excede pas 30 (trente) jours calendaires
+   consecutifs ;
+
+b) le Logiciel est integralement retire et les donnees collectees sont
+   purgees au plus tard a la fin de la mission ;
+
+c) aucun contrat de service recurrent portant sur le Logiciel n'est
+   conclu entre le consultant et le client ;
+
+d) le rapport d'audit mentionne explicitement que toute exploitation
+   perenne du Logiciel par le client necessite la souscription d'une
+   licence commerciale aupres de Spartan Conseil.
+
+Tout deploiement ne respectant pas ces quatre conditions cumulatives
+releve de l'article 3 c) et requiert une licence commerciale.
+
+
+5. RESTRICTIONS
+---------------
+
+L'Utilisateur s'interdit, sauf accord ecrit prealable de Spartan
+Conseil :
+
+a) de decompiler, desassembler, operer une retro-ingenierie ou tenter
+   d'acceder au code source du Logiciel par quelque moyen que ce soit,
+   sous reserve expresse des droits non renoncables prevus a l'article
+   L122-6-1 du Code de la propriete intellectuelle ;
+
+b) de modifier, adapter, traduire le Logiciel ou en creer des oeuvres
+   derivees ;
+
+c) de redistribuer, mettre en miroir, rehberger, republier ou
+   repackager le Logiciel ou ses binaires - Spartan Conseil demeure le
+   seul distributeur autorise via ses canaux officiels
+   (github.com/spartan-conseil/obserae et
+   ghcr.io/spartan-conseil/obserae) ;
+
+d) de retirer ou alterer les mentions de propriete intellectuelle, les
+   marques ou les notices de licence presentes dans le Logiciel ou ses
+   binaires ;
+
+e) de contourner les mecanismes eventuels de verification d'eligibilite
+   ou de protection technique du Logiciel ;
+
+f) d'utiliser les marques "Obserae" et "Spartan Conseil", ainsi que les
+   logos associes, pour promouvoir un produit, un service ou une
+   formation tiers.
+
+
+6. PROPRIETE INTELLECTUELLE
+---------------------------
+
+6.1. Le Logiciel demeure la propriete exclusive de Spartan Conseil.
+     Aucun transfert de droit de propriete intellectuelle n'est opere
+     au profit de l'Utilisateur, hormis la licence d'usage limitee
+     definie a l'article 2.
+
+6.2. Les marques "Obserae" et "Spartan Conseil", ainsi que les logos
+     associes, sont la propriete de Spartan Conseil et sont protegees
+     par les dispositions du Code de la propriete intellectuelle.
+
+6.3. Les donnees collectees, traitees ou produites par l'Utilisateur
+     via le Logiciel - notamment les flux NetFlow, la cartographie
+     reseau, les regles de detection, les sessions, les rapports -
+     demeurent la propriete pleine et entiere de l'Utilisateur.
+     Spartan Conseil n'y a aucun acces et ne revendique aucun droit
+     sur ces donnees.
+
+
+7. ABSENCE DE COLLECTE DE DONNEES
+---------------------------------
+
+Spartan Conseil s'engage contractuellement a ce que le Logiciel
+n'effectue, dans sa version distribuee :
+
+a) aucune telemetrie d'usage ;
+
+b) aucun contact sortant vers des serveurs controles par Spartan
+   Conseil ou des tiers ;
+
+c) aucune verification de licence en ligne.
+
+Le Logiciel est concu pour fonctionner integralement en environnement
+isole, y compris en deploiement air-gap. Toute evolution future de ce
+comportement fera l'objet d'une mention explicite dans une version
+ulterieure du present EULA et necessitera une nouvelle acceptation
+de l'Utilisateur.
+
+
+8. MISES A JOUR ET SUPPORT
+--------------------------
+
+8.1. Spartan Conseil peut publier des mises a jour du Logiciel a sa
+     seule discretion. Aucune obligation de mise a jour, de correctif
+     ou de support n'est attachee a la licence gratuite.
+
+8.2. Le support technique, les correctifs prioritaires, les engagements
+     de niveau de service (SLA) et les developpements specifiques
+     relevent exclusivement des contrats de licence commerciale conclus
+     avec Spartan Conseil.
+
+
+9. GARANTIE - LIMITATION
+------------------------
+
+9.1. LE LOGICIEL EST FOURNI "EN L'ETAT" ("AS IS"), SANS AUCUNE GARANTIE
+     EXPRESSE OU IMPLICITE, NOTAMMENT DE QUALITE MARCHANDE,
+     D'ADEQUATION A UN USAGE PARTICULIER, DE CONTINUITE DE SERVICE OU
+     DE NON-CONTREFACON, DANS LA LIMITE PERMISE PAR LE DROIT FRANCAIS
+     APPLICABLE.
+
+9.2. L'Utilisateur reconnait que le Logiciel est un outil d'observation
+     et d'analyse reseau, et qu'il lui appartient de valider son
+     adequation a ses besoins, son integration dans son architecture
+     et la conformite de son usage avec les reglementations qui lui
+     sont applicables (notamment en matiere de protection des donnees
+     a caractere personnel).
+
+
+10. EXCLUSIONS D'USAGE
+----------------------
+
+10.1. Le Logiciel est concu pour l'observation et l'analyse de
+      trafic reseau dans des environnements informatiques standards.
+      Il n'est ni concu, ni teste, ni certifie pour un usage dans
+      des environnements a risque vital ou a criticite elevee.
+
+10.2. L'Utilisateur s'interdit expressement tout deploiement,
+      installation ou utilisation du Logiciel dans le cadre de
+      systemes ou d'environnements dont la defaillance, l'erreur,
+      le retard ou la compromission pourraient causer des dommages
+      corporels, des pertes de vies humaines ou des dommages
+      environnementaux graves, notamment :
+
+      a) equipements et dispositifs medicaux ;
+      b) systemes de controle aerien, ferroviaire ou maritime ;
+      c) installations nucleaires ou industries Seveso ;
+      d) systemes d'armes ou de defense ;
+      e) infrastructures critiques au sens du Code de la defense
+         (articles L1332-1 et suivants) sans accord prealable
+         specifique de Spartan Conseil.
+
+10.3. L'Utilisateur reconnait que tout usage du Logiciel en
+      violation du present article releve de sa seule responsabilite
+      et qu'il assume integralement les consequences eventuelles
+      d'un tel usage, sans recours possible contre Spartan Conseil.
+
+
+11. LIMITATION DE RESPONSABILITE
+--------------------------------
+
+11.1. Dans la limite permise par la loi, et au titre de la licence
+      gratuite definie a l'article 2, la responsabilite totale et
+      cumulee de Spartan Conseil envers l'Utilisateur est limitee a
+      0 EUR (zero euro), montant correspondant au prix paye par
+      l'Utilisateur pour la licence gratuite.
+
+11.2. Spartan Conseil ne saurait en aucun cas etre tenu responsable
+      des dommages indirects, des pertes de donnees, des pertes
+      d'exploitation, des atteintes a l'image, ni des consequences
+      d'une intrusion, d'un incident de securite ou d'une compromission
+      non detectee par le Logiciel.
+
+11.3. Les limitations enoncees aux articles 11.1 et 11.2 ne
+      s'appliquent pas en cas de faute lourde ou de dol imputable a
+      Spartan Conseil, ni en cas de dommage corporel.
+
+
+12. DUREE ET RESILIATION
+------------------------
+
+12.1. La licence gratuite est concedee pour la duree legale de
+      protection du Logiciel.
+
+12.2. Spartan Conseil peut resilier la licence de plein droit en cas
+      de manquement par l'Utilisateur aux articles 2, 3, 4, 5 ou 10
+      du present contrat, apres mise en demeure restee infructueuse
+      pendant 30 (trente) jours calendaires.
+
+12.3. En cas de resiliation, l'Utilisateur s'engage a cesser
+      immediatement tout usage du Logiciel et a le desinstaller de
+      l'ensemble de ses infrastructures.
+
+12.4. Les articles 5 (Restrictions), 6 (Propriete intellectuelle),
+      9 (Garantie), 10 (Exclusions d'usage), 11 (Responsabilite) et
+      14 (Droit applicable) survivent a la resiliation du contrat.
+
+
+13. CONTROLE DES EXPORTATIONS
+-----------------------------
+
+L'Utilisateur s'engage a respecter les reglementations francaises et
+europeennes applicables au Logiciel en matiere de controle des
+exportations et de sanctions internationales. Il s'interdit notamment
+d'exporter, de reexporter ou de mettre le Logiciel a disposition
+d'entites ou de personnes soumises a un regime de sanctions.
+
+
+14. DROIT APPLICABLE ET JURIDICTION
+-----------------------------------
+
+Le present contrat est regi par le droit francais.
+
+Tout litige relatif a sa validite, son interpretation ou son
+execution sera soumis a la competence exclusive des tribunaux
+francais dans le ressort du siege social de Spartan Conseil, sous
+reserve des dispositions imperatives applicables aux consommateurs
+au sens du Code de la consommation.
+
+
+15. INTEGRALITE - VERSION DE REFERENCE
+--------------------------------------
+
+Le present EULA constitue l'integralite de l'accord entre les parties
+s'agissant de la licence gratuite du Logiciel, a l'exclusion de tout
+autre document, communication ou declaration.
+
+Il est redige en francais et en anglais (EULA.en.txt). EN CAS DE
+DIVERGENCE D'INTERPRETATION ENTRE LES DEUX VERSIONS, LA VERSION
+FRANCAISE PREVAUT.
+
+Si l'une des stipulations du present contrat etait declaree nulle ou
+inapplicable, les autres stipulations conserveraient leur plein effet.
+
+
+================================================================================
+Spartan Conseil Cybersecurite (Spartan Conseil), SARL de droit francais
+Contact licences commerciales : licensing@spartan-conseil.fr
+Mentions legales : https://spartan-conseil.com
+================================================================================

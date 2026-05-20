@@ -1,0 +1,348 @@
+================================================================================
+END-USER LICENSE AGREEMENT (EULA) - OBSERAE
+================================================================================
+
+Version 1.0 - 05/19/2026
+
+Publisher: Spartan Conseil Cybersecurite (hereinafter referred to as
+"Spartan Conseil", its commercial name), a French SARL governed by
+French law.
+
+Commercial licensing contact: licensing@spartan-conseil.fr
+
+
+IMPORTANT - GOVERNING VERSION
+-----------------------------
+This document is a COURTESY ENGLISH TRANSLATION. The binding legal
+text of this EULA is the French version (EULA.txt). IN THE EVENT OF
+ANY DISCREPANCY OR CONFLICT OF INTERPRETATION BETWEEN THE FRENCH AND
+ENGLISH VERSIONS, THE FRENCH VERSION SHALL PREVAIL.
+
+
+RECITALS
+--------
+
+Obserae is a network cybersecurity software (NetFlow collection and
+analysis, cartography, detection) published by Spartan Conseil. It is
+distributed as proprietary binaries and Docker images; its source code
+is not made public.
+
+Spartan Conseil intends Obserae to be freely available to individuals
+and very small organizations, while reserving large-scale professional
+use and service-resale use to the conclusion of a commercial
+agreement. This EULA sets out the terms of that dual offering.
+
+By downloading, installing or using the Software, the User acknowledges
+having read and unconditionally accepts this Agreement.
+
+
+1. DEFINITIONS
+--------------
+
+For the purposes of this Agreement:
+
+"Software" means Obserae, its binaries, Docker images, documentation,
+updates and any component provided by Spartan Conseil under the
+"Obserae" name.
+
+"User" means the natural or legal person who downloads, installs, runs
+or uses the Software.
+
+"Consolidated Group" means the legal entity that operates the Software
+together with its parent, subsidiary and sister companies within the
+meaning of articles L233-1 and L233-3 of the French Commercial Code.
+
+"Persons" means all employees, officers, interns, work-study
+participants, contractors and subcontractors involved for more than 30
+calendar days per year within the Consolidated Group.
+
+"Personal Use" means use of the Software by a natural person acting on
+their own behalf, for non-commercial purposes.
+
+"Eligible Small Business" means any entity whose Consolidated Group
+has at most 20 (twenty) Persons AND whose consolidated revenue for the
+last closed financial year is less than or equal to EUR 2,000,000 (two
+million euros). Both criteria are cumulative.
+
+"Commercial Use" means any use of the Software that is neither
+Personal Use nor internal use by an Eligible Small Business.
+
+"Managed Service" means any offering in which the Software is operated
+by a third party for the benefit of an end client, including MSSP
+(Managed Security Service Provider) offerings, SOC-as-a-Service,
+managed hosting or outsourced monitoring.
+
+
+2. GRANT OF FREE LICENSE
+------------------------
+
+2.1. Spartan Conseil grants the User a free, worldwide, non-exclusive,
+     non-transferable and revocable license to use the Software for:
+
+     a) any Personal Use;
+
+     b) any internal use by an Eligible Small Business.
+
+2.2. This license covers the installation, execution, configuration
+     and use of the Software on infrastructure controlled by the User,
+     for the User's own needs.
+
+2.3. The license is granted for the downloaded version of the Software
+     and for minor updates released under the same major version.
+
+
+3. COMMERCIAL LICENSE REQUIRED
+------------------------------
+
+A commercial license agreement must be entered into with Spartan
+Conseil prior to:
+
+a) any use by an entity that does NOT meet the Eligible Small Business
+   criteria defined in article 1;
+
+b) any provision of the Software as a Managed Service;
+
+c) any use of the Software in the context of a paid service for the
+   benefit of a third party that does not meet the Eligible Small
+   Business criteria (including audit, consulting, integration, managed
+   operations or training delivered to a client above the threshold);
+
+d) any sale of training, certification or paid educational services
+   focused primarily or exclusively on the Software.
+
+Commercial contact: licensing@spartan-conseil.fr
+
+
+4. EXCEPTION - ONE-OFF AUDIT BY AN INDEPENDENT CONSULTANT
+---------------------------------------------------------
+
+By way of exception to article 3 c), an independent consultant - who
+must themselves be a natural person or an Eligible Small Business -
+may deploy the Software on a client's infrastructure above the
+threshold solely for the purpose of a one-off audit, subject to the
+following cumulative conditions:
+
+a) the deployment does not exceed 30 (thirty) consecutive calendar
+   days;
+
+b) the Software is fully removed and the collected data purged no
+   later than the end of the engagement;
+
+c) no recurring service contract relating to the Software is entered
+   into between the consultant and the client;
+
+d) the audit report explicitly states that any permanent operation of
+   the Software by the client requires a commercial license from
+   Spartan Conseil.
+
+Any deployment that does not meet all four cumulative conditions falls
+under article 3 c) and requires a commercial license.
+
+
+5. RESTRICTIONS
+---------------
+
+Unless otherwise expressly authorized in writing by Spartan Conseil,
+the User shall not:
+
+a) decompile, disassemble, reverse-engineer or otherwise attempt to
+   access the source code of the Software by any means whatsoever,
+   subject to the non-waivable rights expressly granted by article
+   L122-6-1 of the French Intellectual Property Code;
+
+b) modify, adapt, translate the Software or create derivative works
+   from it;
+
+c) redistribute, mirror, re-host, republish or repackage the Software
+   or its binaries - Spartan Conseil remains the sole authorized
+   distributor through its official channels
+   (github.com/spartan-conseil/obserae and
+   ghcr.io/spartan-conseil/obserae);
+
+d) remove or alter intellectual property notices, trademarks or
+   license notices included in the Software or its binaries;
+
+e) circumvent any eligibility verification or technical protection
+   mechanisms of the Software;
+
+f) use the "Obserae" and "Spartan Conseil" trademarks or associated
+   logos to promote any third-party product, service or training
+   offering.
+
+
+6. INTELLECTUAL PROPERTY
+------------------------
+
+6.1. The Software remains the exclusive property of Spartan Conseil.
+     No transfer of intellectual property rights is made to the User,
+     other than the limited use license defined in article 2.
+
+6.2. The "Obserae" and "Spartan Conseil" trademarks and associated
+     logos are the property of Spartan Conseil and are protected under
+     the provisions of the French Intellectual Property Code.
+
+6.3. Data collected, processed or produced by the User through the
+     Software - including NetFlow flows, network cartography,
+     detection rules, sessions and reports - remains the sole and
+     entire property of the User. Spartan Conseil has no access to,
+     and claims no right over, such data.
+
+
+7. NO DATA COLLECTION
+---------------------
+
+Spartan Conseil contractually undertakes that the Software, in its
+distributed form:
+
+a) performs no usage telemetry;
+
+b) makes no outbound contact with servers controlled by Spartan
+   Conseil or any third party;
+
+c) performs no online license verification.
+
+The Software is designed to operate entirely in an isolated
+environment, including air-gapped deployments. Any future change to
+this behavior will be explicitly stated in a later version of this
+EULA and will require a new acceptance by the User.
+
+
+8. UPDATES AND SUPPORT
+----------------------
+
+8.1. Spartan Conseil may publish updates to the Software at its sole
+     discretion. No obligation to update, patch or provide support is
+     attached to the free license.
+
+8.2. Technical support, priority fixes, service-level commitments
+     (SLA) and custom development are governed exclusively by
+     commercial license agreements entered into with Spartan Conseil.
+
+
+9. WARRANTY - LIMITATION
+------------------------
+
+9.1. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT ANY EXPRESS OR IMPLIED
+     WARRANTY, INCLUDING ANY WARRANTY OF MERCHANTABILITY, FITNESS FOR
+     A PARTICULAR PURPOSE, CONTINUITY OF SERVICE OR NON-INFRINGEMENT,
+     TO THE FULLEST EXTENT PERMITTED BY APPLICABLE FRENCH LAW.
+
+9.2. The User acknowledges that the Software is a network observation
+     and analysis tool, and that it is the User's responsibility to
+     validate its fitness for their needs, its integration into their
+     architecture, and the compliance of their use with applicable
+     regulations (including in particular those relating to the
+     protection of personal data).
+
+
+10. EXCLUDED HIGH-RISK USES
+---------------------------
+
+10.1. The Software is designed for the observation and analysis of
+      network traffic in standard IT environments. It is neither
+      designed, tested nor certified for use in life-critical or
+      high-criticality environments.
+
+10.2. The User expressly undertakes not to deploy, install or use
+      the Software in or as part of systems or environments whose
+      failure, error, delay or compromise could cause bodily injury,
+      loss of human life or serious environmental damage, including
+      but not limited to:
+
+      a) medical equipment and devices;
+      b) air, rail or maritime traffic control systems;
+      c) nuclear facilities or Seveso-classified industrial sites;
+      d) weapons or defense systems;
+      e) critical infrastructures within the meaning of the French
+         Defense Code (articles L1332-1 et seq.) without specific
+         prior agreement from Spartan Conseil.
+
+10.3. The User acknowledges that any use of the Software in breach
+      of this article is at the User's sole risk and that the User
+      assumes full responsibility for the consequences of such use,
+      with no recourse against Spartan Conseil.
+
+
+11. LIMITATION OF LIABILITY
+---------------------------
+
+11.1. To the fullest extent permitted by law, and in respect of the
+      free license defined in article 2, the total cumulative
+      liability of Spartan Conseil to the User is limited to EUR 0
+      (zero euros), corresponding to the price paid by the User for
+      the free license.
+
+11.2. Spartan Conseil shall in no event be liable for indirect
+      damages, loss of data, loss of business, reputational damage,
+      nor for the consequences of any intrusion, security incident or
+      compromise not detected by the Software.
+
+11.3. The limitations set out in articles 11.1 and 11.2 do not apply
+      in case of gross negligence or willful misconduct by Spartan
+      Conseil, nor in case of bodily injury.
+
+
+12. TERM AND TERMINATION
+------------------------
+
+12.1. The free license is granted for the legal duration of
+      protection of the Software.
+
+12.2. Spartan Conseil may terminate the license as of right in case
+      of breach by the User of articles 2, 3, 4, 5 or 10 of this
+      Agreement, after a formal notice that has remained unanswered
+      for 30 (thirty) calendar days.
+
+12.3. Upon termination, the User shall immediately cease all use of
+      the Software and uninstall it from all infrastructure.
+
+12.4. Articles 5 (Restrictions), 6 (Intellectual Property),
+      9 (Warranty), 10 (Excluded High-Risk Uses), 11 (Liability) and
+      14 (Governing Law) shall survive termination of this Agreement.
+
+
+13. EXPORT CONTROL
+------------------
+
+The User undertakes to comply with French and European regulations
+applicable to the Software in matters of export control and
+international sanctions. In particular, the User shall not export,
+re-export or make the Software available to entities or persons
+subject to a sanctions regime.
+
+
+14. GOVERNING LAW AND JURISDICTION
+----------------------------------
+
+This Agreement is governed by French law.
+
+Any dispute relating to its validity, interpretation or performance
+shall be submitted to the exclusive jurisdiction of the French courts
+in the territorial jurisdiction of Spartan Conseil's registered
+office, subject to the mandatory provisions applicable to consumers
+within the meaning of the French Consumer Code.
+
+
+15. ENTIRE AGREEMENT - GOVERNING VERSION
+----------------------------------------
+
+This EULA constitutes the entire agreement between the parties with
+respect to the free license of the Software, to the exclusion of any
+other document, communication or representation.
+
+It is drawn up in French and English. IN THE EVENT OF ANY DISCREPANCY
+OR CONFLICT OF INTERPRETATION BETWEEN THE FRENCH AND ENGLISH
+VERSIONS, THE FRENCH VERSION (EULA.txt) SHALL PREVAIL.
+
+Should any provision of this Agreement be held to be void or
+unenforceable, the remaining provisions shall remain in full force
+and effect.
+
+
+================================================================================
+Spartan Conseil Cybersecurite (Spartan Conseil), French SARL
+Commercial licensing contact: licensing@spartan-conseil.fr
+
+Legally binding version: EULA.txt (French) - this file is a courtesy
+translation.
+================================================================================

@@ -31,7 +31,10 @@ Click any item in the sidebar to switch page.
 
 The **topbar** is always visible. It shows a live indicator for the
 daemon (green = up, red = unreachable) and the current ingest rate
-(flows per second), pushed in real time over a WebSocket.
+(flows per second), pushed in real time over a WebSocket. When the
+in-memory session map comes under pressure, a **pressure badge**
+appears here too (amber, then red) — so a "too many open sessions"
+condition is visible from any page, not just the cockpit.
 
 The **command palette** (`Ctrl+K`) jumps to any page or searches
 across cartography entities and rules.
@@ -56,6 +59,22 @@ Four zones:
    fraction of closed sessions matched at least one rule in the
    last hour. A low number means your rule set isn't covering
    reality; an analyst should investigate the unmatched sessions.
+5. **Fill gauges** — two bars showing how full obserae's in-memory
+   working sets are. They are **counts against a cap** (open
+   sessions, cached IPs), not a byte figure — but since the cap is
+   what bounds memory, a near-full bar is the memory-pressure
+   signal. Colour-coded green (< 70%), amber (70–90%), red (≥ 90%):
+   - **Open sessions** — how full the in-memory open-session map is
+     versus its `sessions.max_open_ksessions` cap. At ≥ 90% an
+     explicit **CRITICAL banner** appears ("Capacité sessions
+     atteinte … les sessions les plus anciennes sont fermées
+     prématurément. Réseau anormalement bavard ou scan en cours ?")
+     because at that point obserae is force-closing the oldest
+     sessions to stay within memory — see
+     [sessions.md](sessions.md#memory-and-pressure).
+   - **Enrichment LRU** — how full the insert-time enrichment
+     resolver's cache is. A full cache only costs re-resolutions,
+     not correctness.
 
 The Cockpit is the right place to start every shift.
 

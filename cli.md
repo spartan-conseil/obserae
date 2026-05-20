@@ -76,7 +76,18 @@ flows:               1284091
 sessions active:     124
 sessions half-open:  3
 sessions closed:     8945
+
+sessions open (live):  12345 / 500000 (2.5%)
+sessions evicted:      0
+enrich LRU:            412345 / 1000000 (41.2%)
 ```
+
+The last three rows are live fill gauges — entry counts against
+their caps, not bytes: `sessions open (live)` is
+the in-memory session map versus its `max_open_ksessions` cap,
+`sessions evicted` counts sessions force-closed under capacity
+pressure (`close_reason = 'capacity'`), and `enrich LRU` is the
+enrichment resolver's cache versus its capacity.
 
 ---
 

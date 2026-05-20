@@ -105,6 +105,17 @@ sessions:
   # Keeps long sessions as ONE row.
   hard_timeout: 15m
 
+  # Cap on how many sessions may be open at once, in THOUSANDS
+  # (500 = 500_000). Open sessions live in memory; when the cap is
+  # reached the oldest are force-closed (close_reason='capacity')
+  # so memory stays bounded under a scan or flood.
+  max_open_ksessions: 500
+
+  # After a restart, how far back to replay stored flows to rebuild
+  # the in-memory session state. Sessions open at the last flush are
+  # reloaded fully; only the catch-up replay is windowed.
+  recovery_window: 10m
+
   # Idle timeouts — when an open session closes for lack of new
   # packets. Tuned per protocol.
   idle:
@@ -113,6 +124,27 @@ sessions:
     udp: 30s
     icmp: 10s
     other: 60s
+
+correlation:
+  # Groups the per-exporter sessions of one conversation (the same
+  # 5-tuple seen by a switch AND a firewall) under a shared
+  # correlation_id, exposed via the sessions_consolidated table. Pure
+  # overlay — per-exporter rows are untouched, so no double-counting.
+  enabled: true
+  # Slack on the conversation-time overlap test. Matched on the FLOW
+  # clock (when the conversation happened), not record reception: two
+  # exporters flush the same conversation tens of seconds apart, so this
+  # absorbs inter-exporter clock skew. 0 requires a strict overlap.
+  window: 60s
+
+enrichment:
+  # Number of distinct IPs the insert-time enrichment resolver
+  # remembers (LRU). ~32 B each, so 1_000_000 ≈ 32 MB. Higher = fewer
+  # repeat lookups on high-cardinality traffic; lower = less memory.
+  cache_size: 1000000
+  # Refresh stale / never-fetched sources at boot instead of waiting
+  # for the first hourly tick. Default true.
+  fetch_on_startup: true
 
 logging:
   # 0 = INFO   (default — daemon-level events)
@@ -156,7 +188,10 @@ The daemon refuses to start if any of these fails:
 - `control.socket` is empty.
 - `matcher.interval` ≤ 0.
 - `sessions.interval`, `sessions.grace`, `sessions.hard_timeout` ≤ 0.
+- `sessions.max_open_ksessions` or `sessions.recovery_window` ≤ 0.
 - Any `sessions.idle.*` value ≤ 0.
+- `correlation.window` < 0 (when `correlation.enabled`).
+- `enrichment.cache_size` ≤ 0.
 - `logging.verbosity` < 0.
 
 Better to fail loud at startup than to ingest data with a
@@ -281,6 +316,7 @@ something the YAML enabled.
 | `web.*`                 | yes             | no             | Restart to rebind.                                              |
 | `matcher.interval`      | yes             | no             | Restart applies the new cadence.                                |
 | `sessions.*`            | yes             | no             | Restart applies new cadence / cutoffs.                          |
+| `enrichment.cache_size` | yes             | no             | Sizes the resolver LRU at startup.                              |
 | `logging.verbosity`     | yes             | no             | Use `-v*` flags for an ad-hoc bump.                             |
 
 There is no SIGHUP-driven reload yet — restart for configuration

@@ -1,44 +1,72 @@
 # IP enrichment
 
 Enrichment tags the IPs obserae sees with contextual metadata:
-cloud-provider attribution (AWS / Azure / GCP), and — over time —
-open-source threat-intel feeds. Once enabled, every IP that
-appears in the GUI gets a small badge revealing who owns the range
-and where it lives.
+cloud-provider attribution (AWS / Azure / GCP) and open-source
+threat-intel feeds (FireHOL). Once enabled, every IP that appears in
+the GUI gets a small badge revealing who owns the range — and your
+NFQL queries can filter or join on it.
 
 For example, a session to `52.x.x.x` shows up as
-**AWS / us-east-1 / EC2** instead of an opaque IPv4 address.
+**AWS / us-east-1 / EC2** instead of an opaque IPv4 address, and a
+session to a known-bad address is flagged **threat / firehol_level1**.
 
 ---
 
 ## What it does
 
-| Source  | What it tags                                                                                        |
-|---------|------------------------------------------------------------------------------------------------------|
-| AWS     | Service (S3, EC2, AMAZON, CLOUDFRONT…) + region (us-east-1, eu-west-3…). ~15 000 prefixes.           |
-| Azure   | Microsoft systemService + region (regional umbrella tags like `AzureCloud.francecentral` included). ~100 000 prefixes. |
-| Google  | "Google Cloud" + scope (region name, or `global`). ~1 000 prefixes.                                  |
+| Source           | Nature   | What it tags                                                                                        |
+|------------------|----------|------------------------------------------------------------------------------------------------------|
+| AWS              | cloud    | Service (S3, EC2, AMAZON, CLOUDFRONT…) + region (us-east-1, eu-west-3…). ~15 000 prefixes.           |
+| Azure            | cloud    | Microsoft systemService + region (umbrella tags like `AzureCloud.francecentral` included). ~100 000 prefixes. |
+| Google           | cloud    | "Google Cloud" + scope (region name, or `global`). ~1 000 prefixes.                                  |
+| FireHOL Level 1  | threat   | Address space that should never appear in legitimate traffic (attackers, bogons, hijacked ranges).   |
 
-All three sources fetch directly from the cloud provider's
-published list — no third-party feeds, no commercial subscriptions.
+Every source fetches directly from the provider's (or project's)
+published list — no commercial subscriptions, no third-party brokers.
+A cloud IP belongs to at most one provider, but a threat IP can be
+listed by several feeds, so obserae records **one tag per matching
+source**.
 
 ---
 
-## Enabling enrichment
+## Two ways enrichment is used
 
-### From the GUI (recommended)
+The same fetched ranges feed two lookup paths, and you don't have to
+choose between them:
 
-Open the **Data** page and head to the *IP Enrichment* tab. You'll
-see each source with an enable toggle, the last refresh time, and
-the current range count.
+- **In the GUI** — every IP rendered on a page gets its tag resolved
+  on the fly, so tooltips and badges always reflect the latest ranges.
+- **In your queries** — as flows arrive, obserae resolves each IP
+  once and records the match in a table you can **equi-join** in NFQL.
+  That makes "show me every session talking to a threat IP" a cheap,
+  fast query rather than a scan over thousands of CIDRs.
 
-To turn a source on:
+**Private and local addresses are never tagged.** Threat blocklists
+like FireHOL deliberately list private/bogon ranges (e.g.
+`192.168.0.0/16`), so obserae first checks whether an observed IP is
+actually routable on the public internet — RFC1918, loopback,
+link-local, CGNAT and their IPv6 equivalents are skipped. Your
+`192.168.x` / `10.x` hosts will never be flagged as cloud or threat.
 
-1. Click the toggle next to the source name.
-2. Click **Refresh now** — the first fetch pulls the full list
-   (a few seconds for AWS/Google, ~15 s for Azure).
-3. Once `range_count` is non-zero, every IP in the GUI is enriched
-   on the fly.
+---
+
+## On by default
+
+Enrichment is **opt-out**: on a fresh install every source is already
+enabled and the daemon fetches each one at startup, so IPs are enriched
+without any setup. Open the **Data** page → *IP Enrichment* tab to see
+the sources, each with its last refresh time and range count.
+
+The tab is split into two groups:
+
+- **Cloud providers (informational)** — AWS, Azure, Google.
+- **Threat intelligence** — FireHOL Level 1 (and future feeds).
+
+The master switch at the top of the tab is a **kill-switch**: turn it
+off to stop all outbound enrichment traffic at once (no fetches at
+startup or on the hourly tick). You can also disable a single source
+with its own toggle, or click **Refresh now** to pull a freshly
+published list immediately.
 
 ### From the CLI
 
@@ -98,10 +126,10 @@ the provider's HTTP status.
 ## NFQL surface
 
 The enriched ranges live in DuckDB as `enrichment_ip_ranges`,
-exposed to NFQL under the shorter alias **`enrichment_ip`**:
+exposed to NFQL under the shorter alias **`enrichment_ranges`**:
 
 ```nfql
-FROM enrichment_ip
+FROM enrichment_ranges
   | WHERE source == "aws"
   | KEEP cidr, details
 ```
@@ -113,7 +141,7 @@ Available columns:
 | `id`         | UUID      | Row identifier.                                                     |
 | `source`     | VARCHAR   | `aws`, `azure`, `google`.                                           |
 | `cidr`       | INET      | The IP range.                                                       |
-| `nature`     | VARCHAR   | `cloud` (more values to come as threat-intel sources are added).    |
+| `nature`     | VARCHAR   | `cloud` or `threat`.                                                |
 | `details`    | VARCHAR   | Provider-specific string (e.g. `S3 / us-east-1`).                   |
 | `fetched_at` | TIMESTAMP | When this row was loaded. Use with `LAST` / `BETWEEN`.              |
 
@@ -124,13 +152,13 @@ a given cloud range?":
 
 ```nfql
 # Sessions whose server is in any AWS prefix
-FROM enrichment_ip | WHERE source == "aws" | KEEP cidr
+FROM enrichment_ranges | WHERE source == "aws" | KEEP cidr
 > FROM sessions    | PIVOT server_ip WITHIN cidr
                    | LAST 3600
                    | KEEP ip_a, ip_b, server_ip, server_port, ab_bytes
 
 # Same idea but extract per-region detail with a JOIN
-FROM enrichment_ip | WHERE source == "aws" | KEEP cidr, details
+FROM enrichment_ranges | WHERE source == "aws" | KEEP cidr, details
 > FROM sessions    | JOIN server_ip WITHIN cidr
                    | LAST 3600
                    | KEEP ip_a, ip_b, server_ip, prev_details, ab_bytes
@@ -138,6 +166,39 @@ FROM enrichment_ip | WHERE source == "aws" | KEEP cidr, details
 
 The first form keeps the result narrow; the second pulls the cloud
 metadata into each result row via the `prev_` prefix.
+
+### Faster: the `enrichment_ips` table
+
+`enrichment_ranges` is a CIDR catalogue, so the queries above scan ranges
+with `WITHIN`. For traffic that has already been ingested, a second
+table — **`enrichment_ips`** — holds the *exact* IPs obserae already
+resolved at ingest, one row per `(ip, source)`. Because the value is
+the resolved IP itself, you **equi-join** on it (`==`), which is much
+faster on large result sets.
+
+| Column        | Type      | Meaning                                                |
+|---------------|-----------|--------------------------------------------------------|
+| `ip`          | INET      | The resolved IP. Equi-join against `server_ip` / `ip`. |
+| `source`      | VARCHAR   | `aws`, `firehol_level1`, … (several rows per IP for multiple threat feeds). |
+| `nature`      | VARCHAR   | `cloud` or `threat`.                                   |
+| `cidr`        | INET      | Longest matching range the IP fell in.                 |
+| `detail`      | VARCHAR   | Per-source hint (empty for FireHOL).                   |
+| `resolved_at` | TIMESTAMP | When the IP was classified.                            |
+
+```nfql
+# Sessions whose server is on a known threat feed
+FROM enrichment_ips | WHERE nature == "threat" | KEEP ip
+> FROM sessions    | PIVOT ip == server_ip
+                   | LAST 3600
+                   | KEEP ip_a, ip_b, server_ip, ab_bytes
+
+# Sessions annotated with their cloud provider
+FROM enrichment_ips | WHERE nature == "cloud" | KEEP ip, source
+> FROM sessions    | KEEP server_ip, ab_bytes | JOIN ip == server_ip
+```
+
+The left column (`ip`) comes from the first pipeline; the right
+(`server_ip`) from the second.
 
 ---
 
@@ -149,6 +210,7 @@ badge:
 ```
 session opened 10:42:18
   ↳ 10.0.0.10 (host:webserver:eth0) ↔ 52.10.x.x  [AWS · us-west-2 · EC2]
+  ↳ 10.0.0.11 (host:db:eth0)        ↔ 185.x.x.x   [threat · firehol_level1]
 ```
 
 Hover the badge for a tooltip with the provider, region, and
@@ -172,6 +234,7 @@ The published lists themselves update at different cadences:
 - **AWS** — frequently, multiple times per week.
 - **Azure** — weekly, on a rotating filename.
 - **Google** — irregular, typically weekly.
+- **FireHOL Level 1** — continuously, several times a day.
 
 obserae tracks these and adapts automatically — no operator action
 needed beyond initial enablement.

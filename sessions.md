@@ -17,13 +17,19 @@ exporter sent for it.
 
 ```
 flows (append-only, one row per NetFlow record)
-   │
-   │  every ~10s, the engine reads the new flows, folds them into
-   │  the right session rows via set-based SQL — six fixed SQL
-   │  statements per tick, regardless of how many flows.
+   ▲
+   │  each flow streams through the pipeline once. As it passes,
+   │  the sessionizer folds a copy into per-session state held in
+   │  memory — no re-reading the flows table. Every ~10s it closes
+   │  finished sessions and writes the changes to:
    ▼
 sessions  (mutable while state ∈ {active, half_open}, immutable once closed)
 ```
+
+The sessionizer is an **in-memory stage** in the ingestion
+pipeline: folding a flow into its session is a quick in-RAM update,
+so the work per flow stays the same whether the database holds a
+thousand flows or a billion.
 
 A session is the consolidation of all flows sharing the same
 **canonical key**:
@@ -50,7 +56,7 @@ exchange fold into the same row. Counters are split per direction:
             (1st flow)                                 (FIN/RST/idle/no_reply)
    (∅) ─────────────────►  active   ────────────────►  closed
                               ▲ │
-                              │ │ each tick:
+                              │ │ per flow:
                               │ │   accumulate counters
                               │ │   advance last_activity_at
                               │ │
@@ -78,6 +84,7 @@ exchange fold into the same row. Counters are split per direction:
 | `tcp_fin`        | FIN flag observed in **both** directions (TCP only)           |
 | `no_reply`       | `half_open` aged past `tcp_half_open`                         |
 | `idle_timeout`   | `active` aged past the protocol's idle window                 |
+| `capacity`       | The in-memory open-session map hit its cap; the oldest sessions were force-closed to keep memory bounded (see [Memory and pressure](#memory-and-pressure)) |
 | `shutdown`       | Daemon stopped while the session was open *(reserved)*        |
 
 `close_reason` is `NULL` while the session is still open.
@@ -187,9 +194,11 @@ Defaults are sensible. Tune via the `sessions:` block of the YAML
 
 ```yaml
 sessions:
-  interval: 10s             # tick cadence
+  interval: 10s             # close + flush cadence
   grace: 30s                # hold back recent flows (correctness vs latency)
   hard_timeout: 15m         # visibility threshold for long-running sessions
+  max_open_ksessions: 500   # cap on concurrent open sessions (×1000)
+  recovery_window: 10m      # how far back to replay flows after a restart
   idle:
     tcp_established: 60s
     tcp_half_open: 5s       # short on purpose: scans surface fast
@@ -203,6 +212,8 @@ sessions:
 | `interval`        | Smaller → lower closure latency, higher CPU.                                                    |
 | `grace`           | Smaller → lower visibility delay, more late-arrival rejections.                                 |
 | `hard_timeout`    | Smaller → long sessions surface earlier; more in-flight rows visible.                           |
+| `max_open_ksessions` | The ceiling on how many sessions can be open at once before the oldest get force-closed. Raise it if you legitimately have many concurrent conversations; a flood of `capacity` closures means it is too low (or you are being scanned). |
+| `recovery_window` | After a restart, how far back the engine replays flows to rebuild its in-memory state. |
 | `idle.tcp_*`      | Tune to match your environment's keepalive cadence. Most stacks: 60–90 s keepalives.            |
 | `idle.tcp_half_open` | Lower bound is what you can reliably detect — 2 s aggressive, 5 s safe.                       |
 
@@ -214,8 +225,9 @@ NetFlow records sometimes arrive minutes after the underlying
 traffic happened. The engine guards against two failure modes:
 
 - **Recent-but-delayed arrivals** — a flow whose `time_received`
-  is younger than `now - grace` is left untouched by the current
-  tick. The next tick picks it up.
+  is younger than `now - grace` is held back in an ordered
+  in-memory buffer and folded only once it matures. This gives a
+  flow's late siblings time to arrive first.
 - **Truly late arrivals** — a flow whose `time_flow_end` pre-dates
   the `closed_at` of an existing closed session with the same
   canonical key is rejected. Closed sessions are immutable, so the
@@ -225,6 +237,60 @@ traffic happened. The engine guards against two failure modes:
 
 A spike of late-arrival entries usually signals exporter clock
 drift or a too-short `sessions.grace`.
+
+---
+
+## Memory and pressure
+
+Open sessions now live in memory, not on disk, so obserae caps how
+many it will hold at once: `sessions.max_open_ksessions` (in
+thousands; default 500 = 500 000). When the cap is reached, the
+least-recently-active sessions are force-closed with
+`close_reason = 'capacity'` and the new one takes their slot — a
+graceful, bounded fallback instead of unbounded memory growth.
+
+A burst of `capacity` closures means one of two things: a scan or
+SYN flood is opening huge numbers of short-lived sessions, or the
+cap is simply too small for your normal traffic. The cockpit
+surfaces this in real time:
+
+- an **Open sessions** fill gauge — open count vs cap, green /
+  amber / red as the map fills (a count, not bytes),
+- a **CRITICAL banner** when the map is ≥ 90% full ("Capacité
+  sessions atteinte … les sessions les plus anciennes sont fermées
+  prématurément"),
+- a **pressure badge in the topbar** so the warning is visible from
+  any page, not just the cockpit.
+
+See [web-gui.md](web-gui.md#cockpit) for the visual indicators and
+[operations.md](operations.md#monitoring) for the `obserae-cli
+status` gauges.
+
+If obserae restarts, it reloads the sessions that were open at the
+last flush and replays recent flows (bounded by
+`sessions.recovery_window`) so long-running sessions are not
+truncated. Flows that were in flight but not yet stored at the
+moment of a crash are lost — the same small window the raw-flow
+buffer loses.
+
+---
+
+## Multi-source correlation
+
+A session is **per exporter**. When a switch and a firewall both see
+the same conversation, you get two sessions — by design, so their
+byte/packet counters are never double-counted. At close, obserae
+groups them into one **conversation** with a shared `correlation_id`
+(table `sessions_correlation`), matching on the *flow clock* — when the
+conversation actually happened — not record reception time, because two
+exporters flush the same conversation's NetFlow record tens of seconds
+apart.
+
+The `sessions_consolidated` table exposes one row per conversation:
+`min`/`max` volumes across exporters (never summed, so no
+double-counting) and a `coherence_pct` (how much the exporters agree on
+the packet total). `sampler_count > 1` isolates the genuine multi-source
+consolidations. Toggle and tune via the `correlation` config block.
 
 ---
 

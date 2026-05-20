@@ -13,8 +13,8 @@ FROM flows | WHERE ip == "production" AND protocol == TCP | LIMIT 100
 > destination IP is somewhere in the production group and whose
 > protocol is TCP, then return at most 100 rows."
 
-This page is a hands-on guide. For the full grammar and every
-edge case, see the source-of-truth `docs/nfql.md` in the repo.
+This page is a hands-on guide covering the syntax, the operators,
+and a library of copy-able recipes.
 
 ---
 
@@ -85,10 +85,12 @@ Stages run **left-to-right**, like Unix pipes. A `WHERE` after a
 | Table                  | Purpose                                                                              | Time column     |
 |------------------------|---------------------------------------------------------------------------------------|-----------------|
 | `flows`                | Append-only, one row per NetFlow record.                                              | `time_received` |
-| `sessions`             | Bidirectional, role-aware consolidation. See [sessions.md](sessions.md).              | `opened_at`     |
+| `sessions`             | Bidirectional, role-aware consolidation, **per exporter**. Carries `correlation_id`. See [sessions.md](sessions.md). | `opened_at`     |
+| `sessions_consolidated`| One row per **conversation**: the per-exporter sessions of the same 5-tuple merged. `min`/`max` volumes across exporters + `coherence_pct`. | `opened_at`     |
 | `sessions_dead_letter` | Audit trail of flows rejected by the sessionizer (today: late arrivals).              | `dropped_at`    |
 | `session_matches`      | One row per (session, rule) hit. JOIN with `sessions` to recover endpoints.           | `matched_at`    |
-| `enrichment_ip`        | IP-to-cloud-provider mappings (see [enrichment.md](enrichment.md)).                   | `fetched_at`    |
+| `enrichment_ranges`        | CIDR catalogue (cloud + threat). `WITHIN`-join a flow set against `cidr`. See [enrichment.md](enrichment.md). | `fetched_at`    |
+| `enrichment_ips`        | Insert-time dimension: one row per `(ip, source)` resolved at ingest. **Equi-join** on the IP — see [enrichment.md](enrichment.md#faster-the-enrichment_ips-table). | `resolved_at`   |
 
 `LAST` and `BETWEEN` always filter on the listed time column —
 syntax stays the same regardless of which table you query.
@@ -103,7 +105,14 @@ syntax stays the same regardless of which table you query.
 `protocol`, `state` (`active`/`half_open`/`closed`),
 `opened_at`, `closed_at`, `close_reason`, `server_ip`,
 `server_port`, `role_method`, `role_conf`,
-`ab_bytes`/`ba_bytes`, `ab_pkts`/`ba_pkts`.
+`ab_bytes`/`ba_bytes`, `ab_pkts`/`ba_pkts`, `correlation_id`
+(conversation group; NULL while open).
+
+**`sessions_consolidated`**: `correlation_id`, `ip_a`/`port_a`,
+`ip_b`/`port_b`, `protocol`, `session_count`, `sampler_count`,
+`samplers`, `coherence_pct` (0–100), `min_ab_bytes`/`max_ab_bytes`
+(and `_pkts`, and the `ba_` pair), `opened_at`, `closed_at`,
+`server_ip`/`server_port`.
 
 **`session_matches`**: `session_id`, `rule_id`, `matched_at`.
 
@@ -380,11 +389,28 @@ FROM session_matches | LAST 3600
                      | LIMIT 100
 ```
 
-**Sessions whose server is in an AWS range** (using enrichment):
+> **Note.** `sessions.last_flow_id` is present for this contract but
+> always NULL under the in-memory sessionizer (a flow's id is
+> assigned when it is stored, after it has been folded), so the last
+> PIVOT step currently returns no rows. To reach the raw flows
+> behind a session today, pivot on the endpoints and the session's
+> time window instead.
+
+**Sessions whose server is in an AWS range** (CIDR catalogue, `WITHIN`):
 
 ```nfql
-FROM enrichment_ip | WHERE source == "aws" | KEEP cidr
+FROM enrichment_ranges | WHERE source == "aws" | KEEP cidr
 > FROM sessions    | PIVOT server_ip WITHIN cidr
+                   | LAST 3600
+                   | KEEP ip_a, ip_b, server_ip, ab_bytes
+```
+
+**Sessions talking to a known threat IP** (insert-time table, `==`) —
+an equi-join, so it stays fast on large result sets:
+
+```nfql
+FROM enrichment_ips | WHERE nature == "threat" | KEEP ip
+> FROM sessions    | PIVOT ip == server_ip
                    | LAST 3600
                    | KEEP ip_a, ip_b, server_ip, ab_bytes
 ```
@@ -473,6 +499,18 @@ FROM sessions
   | SORT ab_bytes DESC
   | LIMIT 200
 ```
+
+### Conversations seen by more than one exporter
+
+```nfql
+FROM sessions_consolidated
+  | WHERE sampler_count > 1
+  | KEEP ip_a, ip_b, samplers, min_ab_bytes, max_ab_bytes, coherence_pct
+  | SORT coherence_pct ASC
+```
+
+A low `coherence_pct` means the exporters disagree on volume —
+expected under sampling, drops, or partial visibility on one side.
 
 ---
 

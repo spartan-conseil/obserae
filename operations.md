@@ -209,6 +209,12 @@ obserae-cli --socket /var/lib/obserae/run/obserae.sock status --json
 }
 ```
 
+The text form of `status` additionally prints live fill gauges —
+entry counts against their caps, not bytes
+(`sessions open (live)` vs its cap, `sessions evicted`, and
+`enrich LRU`) for the in-memory sessionizer and the enrichment
+resolver — see [cli.md](cli.md#status).
+
 Useful checks to script:
 
 | Check                                                                 | Signal                                                                            |
@@ -217,6 +223,7 @@ Useful checks to script:
 | Parquet files older than 1 minute in `buffer.directory`               | Inserter is stuck (DuckDB or disk problem)                                        |
 | Any rule with non-empty `last_compile_error`                          | Cartography mutation broke a rule reference                                       |
 | Steady growth in matches for an alert rule                            | Detection actually firing                                                         |
+| `sessions open (live)` near its cap, or `sessions evicted` climbing   | The in-memory session map is under pressure — oldest sessions are being force-closed (`capacity`). A scan/flood, or `sessions.max_open_ksessions` is too small. |
 | `sessions_active + sessions_half_open` climbing across many ticks     | Sessions opening but never closing — check FIN/RST observability or timeouts      |
 | `sessions_half_open` ≫ `sessions_active`                              | Asymmetric capture (firewall drops?) or scan storm — both worth alerting          |
 | Non-zero `sessions_dead_letter` count in the last hour                | Late arrivals — typically exporter clock drift or `grace` tuned too short         |
@@ -323,15 +330,28 @@ a database-level problem.
 
 ### Session count is 0 even though flows are coming in
 
-The sessionizer logs once per tick at INFO. Look for these patterns
-in `journalctl -u obserae`:
+The in-memory sessionizer is quiet — it no longer logs a per-tick
+progress line. At INFO you should see it announce itself once at
+startup:
 
-| Log line                                                          | Diagnosis                                                                  |
-|-------------------------------------------------------------------|----------------------------------------------------------------------------|
-| `sessionizer tick flows=N closed=M …`                             | Healthy. N flows consumed, M sessions closed.                              |
-| `sessionizer tick (no flows in delta) watermark=…`                | The flows table has nothing past the cursor — ingestion is idle.           |
-| `sessionizer tick (all flows still in grace window) …`            | Flows present but younger than `sessions.grace`. Picked up on a later tick.|
-| `sessionizer saw eligible flows but processed none — likely bug`  | Real anomaly. The line includes `cutoff_utc`, `now_utc`, etc. — compare them. The most common historical cause was a non-UTC database session, fixed in the daemon since v1.0. |
+```
+in-memory sessionizer started interval=10s grace=30s max_open=500000
+```
+
+and afterwards only `sessionizer tick failed error=…` if a flush
+fails (the engine keeps its in-memory state and retries on the next
+tick). To confirm it is actually folding, watch the live gauge
+rather than the log:
+
+```sh
+obserae-cli --socket /var/lib/obserae/run/obserae.sock status
+# sessions open (live):  12345 / 500000 (2.5%)   ← non-zero ⇒ folding
+```
+
+If that stays at 0 while flows ingest, the most common historical
+cause was a non-UTC database session — fixed in the daemon since
+v1.0. If you ingested data before the fix, wipe the DuckDB file and
+re-ingest.
 
 ---
 

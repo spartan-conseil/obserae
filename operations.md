@@ -201,6 +201,8 @@ obserae-cli --socket /var/lib/obserae/run/obserae.sock status --json
   "started_at":     "2026-04-29T08:12:33Z",
   "uptime_seconds": 3742,
   "flow_count":     1284091,
+  "templates_received":        2,
+  "packets_awaiting_template": 0,
   "networks": 5, "hosts": 11, "services": 23, "groups": 6,
   "rules":    10, "expansions": 1462,
   "sessions_active":     124,
@@ -220,6 +222,7 @@ Useful checks to script:
 | Check                                                                 | Signal                                                                            |
 |-----------------------------------------------------------------------|------------------------------------------------------------------------------------|
 | `flow_count` not increasing                                           | Exporter not sending, port firewalled, or pipeline stuck                          |
+| `flow_count: 0` with `packets_awaiting_template > 0`                  | NetFlow v9 cold-start blackout: packets arrive but no template is known. Known templates persist across restarts, so this means a brand-new exporter — wait for its next refresh or force it with `configctl netflow stop && configctl netflow start` on OPNsense. |
 | Parquet files older than 1 minute in `buffer.directory`               | Inserter is stuck (DuckDB or disk problem)                                        |
 | Any rule with non-empty `last_compile_error`                          | Cartography mutation broke a rule reference                                       |
 | Steady growth in matches for an alert rule                            | Detection actually firing                                                         |

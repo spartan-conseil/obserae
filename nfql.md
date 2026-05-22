@@ -216,10 +216,10 @@ picks the right interpretation:
 
 | String                    | Meaning                                                |
 |---------------------------|--------------------------------------------------------|
-| `"192.168.1.1"`           | The exact IP                                           |
-| `"10.0.0.0/8"`            | The exact CIDR (use `WITHIN` for containment)          |
-| `"any"`                   | Reserved: every IP                                     |
-| `"internet"`              | Routable internet (excludes RFC1918, loopback, …)      |
+| `"192.168.1.1"`           | The exact IP (IPv4 or IPv6, e.g. `"2001:db8::1"`)      |
+| `"10.0.0.0/8"`            | The exact CIDR (IPv4 or IPv6, e.g. `"2001:db8::/64"`; use `WITHIN` for containment) |
+| `"any"`                   | Reserved: every IP — IPv4 **and** IPv6                 |
+| `"internet"`              | Public unicast internet — IPv4 **and** IPv6 (excludes RFC1918 / ULA, loopback, link-local, …) |
 | `"network:NAME"`          | The named network's CIDR                               |
 | `"host:NAME"`             | Every interface IP of the host                         |
 | `"host:NAME:IFACE"`       | One specific interface IP                              |
@@ -237,6 +237,16 @@ FROM sessions | WHERE server_ip == "group:databases" AND server_port == 5432
 The lookup is **dynamic** — if the cartography changes between two
 runs of the same compiled query, the next run reflects the new
 state.
+
+IPv6 addresses use the **same** quoted-string syntax as IPv4 —
+there is no special form:
+
+```nfql
+FROM flows | WHERE ip == "2001:db8::1"
+FROM sessions | WHERE server_ip WITHIN "2001:db8::/64"
+```
+
+`WITHIN "internet"` and `WITHIN "any"` cover IPv6 as well as IPv4.
 
 ---
 

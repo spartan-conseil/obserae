@@ -145,6 +145,9 @@ Filters across the top:
 - **Unmatched only** — show only closed sessions that *no rule*
   caught. This is the canonical "what's anomalous?" filter.
 
+An IPv6 endpoint with a port renders in RFC 3986 bracket notation —
+`[2001:db8::1]:443` — so the port stays unambiguous.
+
 Each row in the table is **click-throughable** — a drawer slides
 in with the session's full detail (counters per direction, role
 inference, raw flows that contributed, matched rules).
@@ -200,9 +203,16 @@ backends-to-redis          no              24              0
 
 What you can do:
 
-- **Create / edit a rule** — a form with searchable chip pickers
-  for `src` and `dst`, dropdowns for protocol, and a live preview
-  of how many expansions the rule will compile to.
+- **Create / edit a rule** — a form with **Name** and
+  **Description** in full width at the top, then two side-by-side
+  blocks: **SOURCE** (left) and **DESTINATION** (right). Each block
+  has an entity picker (host / group / network), a **port/service**
+  field, and an interface picker. The source port/service defaults
+  to `*` (any port). The entity autocomplete also offers the
+  reserved `any` and `internet` keywords. The port/service field
+  carries the protocol (`*/TCP`, `53/UDP`, or a catalogued service
+  name like `https`) — there is no separate protocol dropdown. A
+  live preview shows how many expansions the rule will compile to.
 - **Enable / disable** — toggle the row's switch. Disabled rules
   cost zero CPU per tick.
 - **Click a rule** to see its compiled expansions plus a chart of
@@ -260,10 +270,12 @@ What you configure:
 - A **rate** — flows per second to inject.
 - A **duration** — `1m`, `5m`, `1h`, or run indefinitely.
 
-Simulated flows enter the same pipeline as real exporters — they
-are written to DuckDB, sessionized, matched against rules. The only
-difference is the `sampler_address` (a fixed loopback IP) so you
-can distinguish them at query time:
+Simulated flows enter the **same pipeline** as real exporters —
+they are sessionized, enriched, matched against rules, and shown on
+the cartography, exactly like real NetFlow. They produce genuine
+**sessions**, not just raw flow rows. The only difference is the
+`sampler_address` (a fixed loopback IP) so you can distinguish them
+at query time:
 
 ```nfql
 FROM flows | WHERE sampler_address == "127.0.0.1"

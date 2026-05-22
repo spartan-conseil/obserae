@@ -87,6 +87,9 @@ The daemon refuses any import that violates one of:
 - VLAN id is in `1..4094` (or omitted).
 - Interface name is non-empty and unique on its host.
 - An interface's `ip` parses and lies inside its network's CIDR.
+  IPv4 and IPv6 are both accepted. Attaching a **public** IPv6
+  address to the `internet` network is allowed; an ULA or
+  link-local IPv6 is rejected (it is not routable internet).
 - Service name is non-empty and unique on its host.
 - TCP/UDP services declare a port in `1..65535`. ICMP services must
   **not** declare a port.
@@ -202,8 +205,8 @@ compared to `INET` columns accept the same grammar:
 
 | Form                       | Meaning                                                      |
 |----------------------------|--------------------------------------------------------------|
-| `any`                      | Reserved keyword: every possible address (`0.0.0.0/0` ∪ `::/0`) |
-| `internet`                 | Routable internet — excludes RFC1918, loopback, multicast, CGNAT, link-local, IETF test ranges (103 IPv4 CIDRs) |
+| `any`                      | Reserved keyword: every possible address — IPv4 **and** IPv6 (`0.0.0.0/0` ∪ `::/0`) |
+| `internet`                 | Public unicast internet, IPv4 **and** IPv6 — the default route minus RFC1918 / ULA, loopback, link-local, CGNAT, multicast and reserved ranges |
 | `host:NAME`                | Every interface IP of the named host                         |
 | `host:NAME:IFACE`          | One specific interface IP                                    |
 | `group:NAME`               | Every interface IP of every member host (recursive)          |
@@ -213,7 +216,7 @@ compared to `INET` columns accept the same grammar:
 
 The `internet` keyword is computed once at startup and is the *same
 set* both the rule engine and NFQL use — one source of truth for
-"what is the public internet".
+"what is the public internet", covering both IPv4 and IPv6.
 
 ---
 

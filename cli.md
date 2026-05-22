@@ -72,6 +72,8 @@ rules:               10
 expansions:          1462
 
 flows:               1284091
+templates reçus:     2
+paquets en attente de template: 0
 
 sessions active:     124
 sessions half-open:  3
@@ -81,6 +83,17 @@ sessions open (live):  12345 / 500000 (2.5%)
 sessions evicted:      0
 enrich LRU:            412345 / 1000000 (41.2%)
 ```
+
+`templates reçus` (`templates_received`) is the number of NetFlow v9
+templates persisted to disk. obserae now keeps v9 templates in DuckDB
+and reloads them at boot, so a restart no longer blacks out flow
+decoding while waiting for the exporter's next template refresh.
+`paquets en attente de template` (`packets_awaiting_template`) is the
+running count of data packets the decoder had to drop for lack of a
+template — a non-zero value **with `flows: 0`** means a brand-new
+exporter the daemon has never seen; force its template with
+`configctl netflow stop && configctl netflow start` on OPNsense, or
+wait for the next refresh.
 
 The last three rows are live fill gauges — entry counts against
 their caps, not bytes: `sessions open (live)` is
@@ -215,6 +228,12 @@ obserae-cli rule update NAME \
     [--enabled=BOOL]
 obserae-cli rule rm NAME   [--yes] [--dry-run]
 ```
+
+The protocol is normally carried by `--src-service` /
+`--dst-service` (`*/TCP`, `53/UDP`, or a catalogued service name).
+`--protocol P` is an optional legacy override that is reconciled
+with the service tokens — it must not contradict a protocol pinned
+by either side. See [rules.md](rules.md#the-portservice-field).
 
 The reference syntax for `--src` / `--dst` is described in
 [cartography.md](cartography.md#references-used-by-rules-and-nfql).

@@ -3,8 +3,8 @@
 A rule is one **legitimate** (or one **forbidden**) pattern of
 traffic that obserae's matcher looks for in your sessions. Each
 rule is authored symbolically — `src: backends, dst: postgres,
-dst_service: postgres, protocol: TCP` — and the engine takes care
-of turning it into the underlying IP/port comparisons.
+dst_service: postgres` — and the engine takes care of turning it
+into the underlying IP/port comparisons.
 
 The interesting signals are:
 
@@ -42,13 +42,16 @@ rules:
     description: "Backends opening PostgreSQL connections"
     src: backends                  # any cartography reference
     src_iface: eth1                # optional — only valid for host refs
-    src_service: "*"               # service name on src host(s), or "*"
+    src_service: "*"               # port/service on src side (see below)
     dst: postgres
     dst_iface: eth1
     dst_service: postgres
-    protocol: TCP                  # TCP | UDP | ICMP | ANY
     enabled: true                  # default true; matcher skips disabled rules
 ```
+
+There is **no separate `protocol:` field**. The protocol is derived
+from the `src_service` / `dst_service` values (see
+[The port/service field](#the-portservice-field) below).
 
 A rule has **no orientation** field. Sessions are non-oriented
 (endpoints are folded into canonical IP order), so the matcher's
@@ -61,7 +64,7 @@ know which side initiated, look at the session's `server_ip` and
 
 - **`name`** — unique across rules.
 - **`src`**, **`dst`** — both required; either can be `any` or `internet`.
-- **`src_service`**, **`dst_service`** — required; use `"*"` for "any port".
+- **`src_service`**, **`dst_service`** — required; use `"*"` for "any port". See [The port/service field](#the-portservice-field).
 
 ### Optional fields
 
@@ -70,8 +73,34 @@ know which side initiated, look at the session's `server_ip` and
 | `description`   | string | empty   | Free-form, shown in the GUI and `rule show`.                          |
 | `src_iface`     | string | none    | Restrict a host reference to a single interface. Cannot mix with non-host kinds. |
 | `dst_iface`     | string | none    | Same on the dst side.                                                  |
-| `protocol`      | string | `ANY`   | `TCP` / `UDP` / `ICMP` / `ANY`. Compiler rejects mismatched service protocols. |
 | `enabled`       | bool   | `true`  | When false, the rule lives in the DB but the matcher skips it. Use to stage a rule before turning it on. |
+
+### The port/service field
+
+`src_service` and `dst_service` carry **both** the port and the
+protocol — there is no longer a separate `protocol:` field. Each
+side accepts one of:
+
+| Value           | Meaning                                                |
+|-----------------|--------------------------------------------------------|
+| `*`             | Any port (protocol unconstrained on this side)         |
+| `*/TCP`         | Any port, protocol pinned (`TCP` / `UDP` / `ICMP`)     |
+| `53/UDP`        | A specific port **and** protocol                       |
+| `https`         | A catalogued service name — resolves to its port + protocol from the cartography |
+
+A **bare port without a protocol** (`53`) and **port ranges** are
+rejected.
+
+The protocol is **derived** from the two sides:
+
+- You must pin the protocol on **at least one** side, otherwise the
+  rule is rejected (there is no `ANY` protocol any more).
+- If both sides pin a protocol and they **conflict** (`*/TCP` on one
+  side, `53/UDP` on the other), the rule is rejected.
+
+`internet`, `any` and `network` references accept `*`, `*/PROTO` and
+`PORT/PROTO` (so `internet -> 53/UDP` works), but **not** a service
+name — service names are reserved for `host` / `group` references.
 
 ### Reference syntax for `src` / `dst`
 
@@ -97,7 +126,6 @@ src_service:     *
 dst:             postgres
 dst_iface:       eth1
 dst_service:     postgres
-protocol:        TCP
 enabled:         true
 expansions:      24
 last_compile_error:
@@ -131,7 +159,6 @@ the YAML is removed. Use per-entity commands for incremental edits.
 obserae-cli rule add backends-to-redis \
     --src backends --dst redis \
     --src-service '*' --dst-service redis \
-    --protocol TCP \
     --description "Backends caching to Redis"
 
 obserae-cli rule ls
@@ -186,8 +213,7 @@ to. Example:
   src: bastion              # 1 host × 1 admin iface  = 1 CIDR
   dst: production           # 9 hosts × 1 ssh iface  = 9 IPs (only ssh-bound!)
   src_service: "*"
-  dst_service: ssh
-  protocol: TCP
+  dst_service: ssh          # service name pins port + protocol (TCP/22)
 ```
 
 That produces **9 expansions** rather than 26 you'd get with

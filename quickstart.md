@@ -110,17 +110,21 @@ rules:
     src: webserver
     src_service: "*"
     dst: database
-    dst_service: postgres
-    protocol: TCP
+    dst_service: postgres        # service name pins port + protocol
 
   - name: public-https
     description: "Anyone on the internet can reach the webserver on HTTPS"
     src: internet
     src_service: "*"
     dst: webserver
-    dst_service: https
-    protocol: TCP
+    dst_service: https           # service name pins port + protocol
 ```
+
+> The protocol is derived from the `src_service` / `dst_service`
+> values — there is no separate `protocol:` field. A catalogued
+> service name (`postgres`, `https`) carries its own port and
+> protocol; otherwise pin it explicitly with `*/TCP` or `53/UDP`.
+> See [rules.md](rules.md#the-portservice-field).
 
 Import:
 

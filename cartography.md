@@ -16,7 +16,7 @@ instead of dragging IPs and CIDRs around.
 
 | Entity        | What it is                                                                       |
 |---------------|-----------------------------------------------------------------------------------|
-| **Network**   | A CIDR block with a name and an optional VLAN id.                                |
+| **Network**   | A CIDR block with a name, an optional VLAN id, and an optional [DHCP range](#dhcp-networks). |
 | **Host**      | A machine, identified by name. Carries interfaces and services.                  |
 | **Interface** | A `(host, name, network, IP)` tuple. The IP must belong to the network's CIDR.   |
 | **Service**   | A `(host, name, protocol, port, [interfaces])` tuple — a port on a host's interface(s). |
@@ -49,6 +49,10 @@ networks:
   - name: "data"
     cidr: "192.168.3.0/24"
     vlan: 40
+  - name: "office"
+    cidr: "192.168.10.0/24"
+    dhcp_start: "192.168.10.100"   # optional DHCP pool (see below)
+    dhcp_end: "192.168.10.200"
 
 hosts:
   - name: "pg-01"
@@ -82,17 +86,29 @@ groups:
 The daemon refuses any import that violates one of:
 
 - Names are unique across networks/hosts/groups.
-- A network's `cidr` parses, has a non-zero prefix, and a non-zero
-  network address (no `0.0.0.0/0`).
+- The names `internet4`, `internet6`, `any4` and `any6` are
+  reserved keywords and cannot be redeclared.
+- A network's `cidr` parses to a canonical form (no host bits set).
+  Any prefix length is accepted, including the default route
+  `0.0.0.0/0` and `::/0`.
 - VLAN id is in `1..4094` (or omitted).
+- A DHCP range, if present, sets **both** `dhcp_start` and `dhcp_end`,
+  with both inside the network's CIDR and `dhcp_start <= dhcp_end`.
 - Interface name is non-empty and unique on its host.
 - An interface's `ip` parses and lies inside its network's CIDR.
-  IPv4 and IPv6 are both accepted. Attaching a **public** IPv6
-  address to the `internet` network is allowed; an ULA or
-  link-local IPv6 is rejected (it is not routable internet).
+  IPv4 and IPv6 are both accepted. The reserved networks have
+  their own per-family routability rule: `internet4` only accepts
+  a publicly-routable IPv4 (no RFC1918, loopback, link-local,
+  CGNAT, multicast, reserved); `internet6` only accepts a global
+  unicast IPv6 (no ULA, loopback, link-local, multicast). `any4` /
+  `any6` accept any address of the matching family.
 - Service name is non-empty and unique on its host.
-- TCP/UDP services declare a port in `1..65535`. ICMP services must
-  **not** declare a port.
+- A service's `protocol` is one of: `TCP`, `UDP`, `ICMP`, `IGMP`,
+  `GRE`, `AH`, `ESP`, `OSPF`, `SCTP`, `ICMPv6`. Names are
+  case-insensitive.
+- `TCP`, `UDP` and `SCTP` services declare a port in `1..65535`.
+  Every other protocol (the layer-3 ones — ICMP, IGMP, GRE, AH,
+  ESP, OSPF, ICMPv6) must **not** declare a port.
 - A service binds to at least one interface that exists on the same
   host.
 - Group members exist as hosts or as previously-declared groups.
@@ -146,6 +162,68 @@ The **Cartography** page is a live interactive graph. Right-click
 any node for create / rename / delete actions, or right-click the
 empty canvas to create a new entity. See
 [web-gui.md](web-gui.md#cartography).
+
+---
+
+## DHCP networks
+
+Some segments — office LANs, Wi-Fi, guest networks — hand out
+addresses dynamically with DHCP. You can't model each lease as a
+host: they rotate constantly, and they'd flood the orphan list with
+hundreds of `192.168.10.x` you'll never name.
+
+Instead, tell obserae which slice of the network is the DHCP pool.
+Set a **start** and **end** address on the network:
+
+```yaml
+networks:
+  - name: "office"
+    cidr: "192.168.10.0/24"
+    dhcp_start: "192.168.10.100"
+    dhcp_end: "192.168.10.200"
+```
+
+or, in the GUI, open the network's edit form and fill the **DHCP
+range** fields (both or neither). The per-entity CLI does not have a
+flag for it — use the YAML or the GUI.
+
+Once a network has a DHCP range:
+
+- **Dynamic IPs stop being orphans.** An address seen in the pool
+  shows up as `office · 192.168.10.142` across the Sessions and
+  Riverview views — attached to the network, not flagged as unknown.
+- **Static reservations keep their name.** If you *do* declare an
+  interface inside the pool (a printer, the gateway), it keeps its
+  host name — the exact match always wins over the pool label.
+- **The orphan list stays clean.** Pool addresses no longer appear
+  there. (Network and broadcast addresses — the `.0` and `.255` of a
+  `/24`, for instance — are filtered from orphans too: they're never
+  real machines.)
+- **The graph shows the pool.** On the Cartography page each network
+  with a DHCP range gets a **hexagonal companion node** tethered to it
+  by a dashed edge. The hexagon's label is `DHCP · N`, where N is the
+  count of distinct in-range IPs seen over the last 24 hours — so the
+  pool's activity is visible at a glance, even dezoomed. Clicking the
+  hexagon opens a **dedicated DHCP drawer** showing the bounds and the
+  live leases. The network's own drawer still carries the same DHCP
+  row and lease list, so either path works. The hexagon is purely a
+  view of the network: it has no Edit / Delete actions of its own —
+  the range itself is edited via the parent network's form.
+
+You can also **query** the two halves of the network by name —
+`office.dhcp` (the pool) and `office.static` (everything else) — in
+both NFQL and detection rules:
+
+```nfql
+# who is active on the DHCP pool right now?
+FROM sessions | LAST 3600 | WHERE ip == "office.dhcp"
+
+# a dynamic client talking to the IPv4 internet (use internet6 for v6)
+FROM sessions | WHERE ip == "office.dhcp" AND ip == "internet4"
+```
+
+See [nfql.md](nfql.md#cartography-references) and
+[rules.md](rules.md) for more.
 
 ---
 
@@ -205,18 +283,27 @@ compared to `INET` columns accept the same grammar:
 
 | Form                       | Meaning                                                      |
 |----------------------------|--------------------------------------------------------------|
-| `any`                      | Reserved keyword: every possible address — IPv4 **and** IPv6 (`0.0.0.0/0` ∪ `::/0`) |
-| `internet`                 | Public unicast internet, IPv4 **and** IPv6 — the default route minus RFC1918 / ULA, loopback, link-local, CGNAT, multicast and reserved ranges |
+| `any4`                     | Reserved keyword: every IPv4 address (`0.0.0.0/0`)            |
+| `any6`                     | Reserved keyword: every IPv6 address (`::/0`)                 |
+| `internet4`                | Public unicast IPv4 — `0.0.0.0/0` minus RFC1918, loopback, link-local, CGNAT, multicast and reserved ranges |
+| `internet6`                | Public unicast IPv6 — `::/0` minus ULA (`fc00::/7`), loopback, link-local (`fe80::/10`), multicast and IPv4-mapped ranges |
 | `host:NAME`                | Every interface IP of the named host                         |
 | `host:NAME:IFACE`          | One specific interface IP                                    |
 | `group:NAME`               | Every interface IP of every member host (recursive)          |
 | `network:NAME`             | The whole CIDR of the named network                          |
+| `NAME.dhcp`                | Just the network's DHCP pool (needs a [DHCP range](#dhcp-networks)) |
+| `NAME.static`              | The network's CIDR **minus** its DHCP pool                   |
 | `NAME` (bare)              | Looked up across networks / hosts / groups                   |
 | `NAME:IFACE` (bare)        | Same as `host:NAME:IFACE`                                    |
 
-The `internet` keyword is computed once at startup and is the *same
-set* both the rule engine and NFQL use — one source of truth for
-"what is the public internet", covering both IPv4 and IPv6.
+The reserved keywords are **family-specific**: `internet4` /
+`internet6` and `any4` / `any6` each expand to one IP family only.
+There is no bare `internet` or `any` keyword that spans both — if
+you need both families, declare two rules (or two NFQL clauses)
+using `internet4` and `internet6` side by side. The keyword
+definitions are evaluated by the same code path in the rule engine
+and the NFQL planner, so a rule and a query that both reference
+`internet4` see the exact same CIDR set.
 
 ---
 

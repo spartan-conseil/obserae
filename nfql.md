@@ -218,20 +218,26 @@ picks the right interpretation:
 |---------------------------|--------------------------------------------------------|
 | `"192.168.1.1"`           | The exact IP (IPv4 or IPv6, e.g. `"2001:db8::1"`)      |
 | `"10.0.0.0/8"`            | The exact CIDR (IPv4 or IPv6, e.g. `"2001:db8::/64"`; use `WITHIN` for containment) |
-| `"any"`                   | Reserved: every IP — IPv4 **and** IPv6                 |
-| `"internet"`              | Public unicast internet — IPv4 **and** IPv6 (excludes RFC1918 / ULA, loopback, link-local, …) |
+| `"any4"` / `"any6"`       | Reserved: every IP of one family (`0.0.0.0/0` or `::/0`) |
+| `"internet4"` / `"internet6"` | Public unicast of one family (excludes RFC1918 / ULA, loopback, link-local, CGNAT, multicast, reserved) |
 | `"network:NAME"`          | The named network's CIDR                               |
+| `"NAME.dhcp"`             | The network's DHCP pool only (needs a [DHCP range](cartography.md#dhcp-networks)) |
+| `"NAME.static"`           | The network's CIDR **minus** its DHCP pool             |
 | `"host:NAME"`             | Every interface IP of the host                         |
 | `"host:NAME:IFACE"`       | One specific interface IP                              |
 | `"group:NAME"`            | Every IP of every member host (recursive)              |
 | `"NAME"` (bare)           | Looked up across networks/hosts/groups                 |
 
 ```nfql
-FROM flows | WHERE src_addr == "internet" AND dst_addr == "loadbalancers"
+FROM flows | WHERE src_addr == "internet4" AND dst_addr == "loadbalancers"
 FROM flows | WHERE ip IN ("10.0.0.0/8", "host:proxy", "group:backends")
 
 FROM sessions | WHERE ip == "host:proxy" AND state == "active"
 FROM sessions | WHERE server_ip == "group:databases" AND server_port == 5432
+
+# the dynamic side vs the fixed side of a DHCP segment
+FROM sessions | WHERE ip == "office.dhcp"
+FROM flows    | WHERE src_addr == "office.static"
 ```
 
 The lookup is **dynamic** — if the cartography changes between two
@@ -246,7 +252,10 @@ FROM flows | WHERE ip == "2001:db8::1"
 FROM sessions | WHERE server_ip WITHIN "2001:db8::/64"
 ```
 
-`WITHIN "internet"` and `WITHIN "any"` cover IPv6 as well as IPv4.
+The reserved keywords are **family-specific**: `"internet4"` and
+`"any4"` only match IPv4 addresses, `"internet6"` and `"any6"` only
+IPv6. To match both families in one query, combine them — e.g.
+`WHERE ip == "internet4" OR ip == "internet6"`.
 
 ---
 
@@ -447,7 +456,7 @@ FROM flows
 ```nfql
 FROM flows
   | WHERE src_addr == "backends"
-        AND dst_addr == "internet"
+        AND (dst_addr == "internet4" OR dst_addr == "internet6")
         AND dst_addr != "host:proxy:eth1"
 ```
 

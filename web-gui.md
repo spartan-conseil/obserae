@@ -100,6 +100,11 @@ What you can do on this page:
 
 - **Click a host or group** to open a side drawer with its detail:
   interfaces, services, current session activity, recent matches.
+- **A hexagon labelled `DHCP · N`** is tethered to every network
+  that has a DHCP range — N counts the distinct in-range IPs seen
+  over the last 24h. Click the hexagon to open a dedicated drawer
+  with the pool bounds and the live leases (see
+  [cartography.md](cartography.md#dhcp-networks)).
 - **Right-click a node** for the create / rename / delete actions.
 - **Box-select** several nodes to group them in one click.
 - **Wheel to zoom**, drag the canvas to pan.
@@ -139,8 +144,9 @@ Filters across the top:
   explicit range.
 - **State** — active, half-open, closed.
 - **Source / destination** — chip pickers populated from your
-  cartography. Accept hosts, groups, networks, and the reserved
-  keywords `any` and `internet`.
+  cartography. Accept hosts, groups, networks, and the
+  family-specific reserved keywords `any4` / `any6` and
+  `internet4` / `internet6`.
 - **Port / protocol** — narrow by destination port and L4 protocol.
 - **Unmatched only** — show only closed sessions that *no rule*
   caught. This is the canonical "what's anomalous?" filter.
@@ -209,7 +215,12 @@ What you can do:
   has an entity picker (host / group / network), a **port/service**
   field, and an interface picker. The source port/service defaults
   to `*` (any port). The entity autocomplete also offers the
-  reserved `any` and `internet` keywords. The port/service field
+  family-specific reserved keywords `any4` / `any6` and `internet4`
+  / `internet6`, plus the DHCP projections
+  `network:NAME.dhcp` / `network:NAME.static` for any network that
+  has a DHCP range — type a dot (`office.`) or the keyword `dhcp` /
+  `static` to reveal them; bare-name lookups stay uncluttered. The
+  port/service field
   carries the protocol (`*/TCP`, `53/UDP`, or a catalogued service
   name like `https`) — there is no separate protocol dropdown. A
   live preview shows how many expansions the rule will compile to.

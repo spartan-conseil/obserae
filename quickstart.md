@@ -113,12 +113,17 @@ rules:
     dst_service: postgres        # service name pins port + protocol
 
   - name: public-https
-    description: "Anyone on the internet can reach the webserver on HTTPS"
-    src: internet
+    description: "Anyone on the IPv4 internet can reach the webserver on HTTPS"
+    src: internet4               # family-specific keyword; add a twin rule with internet6 for v6
     src_service: "*"
     dst: webserver
     dst_service: https           # service name pins port + protocol
 ```
+
+> The `internet4` / `internet6` keywords are **family-specific**:
+> there is no bare `internet` token that spans both. If your
+> webserver is dual-stack, add a second rule with `src: internet6`
+> — same structure, different family.
 
 > The protocol is derived from the `src_service` / `dst_service`
 > values — there is no separate `protocol:` field. A catalogued
@@ -169,7 +174,7 @@ obserae-cli status
 obserae-cli query 'FROM flows | LAST 60 | LIMIT 10'
 
 # Anything from outside that hit the webserver?
-obserae-cli query 'FROM flows | WHERE src_addr == "internet" AND dst_addr == "webserver"'
+obserae-cli query 'FROM flows | WHERE src_addr == "internet4" AND dst_addr == "webserver"'
 
 # What did the matcher catch?
 obserae-cli matches ls --since 5m

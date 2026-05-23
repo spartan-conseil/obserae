@@ -63,7 +63,7 @@ know which side initiated, look at the session's `server_ip` and
 ### Required fields
 
 - **`name`** — unique across rules.
-- **`src`**, **`dst`** — both required; either can be `any` or `internet`.
+- **`src`**, **`dst`** — both required; either can be `any4` / `any6` or `internet4` / `internet6` (family-specific keywords — see [cartography.md](cartography.md#reference-syntax-used-by-rules-and-nfql)).
 - **`src_service`**, **`dst_service`** — required; use `"*"` for "any port". See [The port/service field](#the-portservice-field).
 
 ### Optional fields
@@ -84,9 +84,15 @@ side accepts one of:
 | Value           | Meaning                                                |
 |-----------------|--------------------------------------------------------|
 | `*`             | Any port (protocol unconstrained on this side)         |
-| `*/TCP`         | Any port, protocol pinned (`TCP` / `UDP` / `ICMP`)     |
+| `*/TCP`         | Any port, protocol pinned (see list below)             |
 | `53/UDP`        | A specific port **and** protocol                       |
 | `https`         | A catalogued service name — resolves to its port + protocol from the cartography |
+
+Supported protocol names (case-insensitive): `TCP`, `UDP`, `ICMP`,
+`IGMP`, `GRE`, `AH`, `ESP`, `OSPF`, `SCTP`, `ICMPv6`. A port is
+only meaningful for `TCP`, `UDP` and `SCTP` — a form like `80/IGMP`
+is rejected because IGMP does not carry an L4 port. Use `*/IGMP`,
+`*/GRE`, … to match those protocols.
 
 A **bare port without a protocol** (`53`) and **port ranges** are
 rejected.
@@ -98,17 +104,43 @@ The protocol is **derived** from the two sides:
 - If both sides pin a protocol and they **conflict** (`*/TCP` on one
   side, `53/UDP` on the other), the rule is rejected.
 
-`internet`, `any` and `network` references accept `*`, `*/PROTO` and
-`PORT/PROTO` (so `internet -> 53/UDP` works), but **not** a service
-name — service names are reserved for `host` / `group` references.
+`internet4` / `internet6`, `any4` / `any6` and `network` references
+accept `*`, `*/PROTO` and `PORT/PROTO` (so `internet4 -> 53/UDP`
+works), but **not** a service name — service names are reserved for
+`host` / `group` references. With `*/PROTO` (or `*`), the compiler
+does **not** restrict the destination IPs to interfaces that bind a
+matching service, since there is no service name to look up: every
+CIDR in the endpoint is emitted as-is.
 
 ### Reference syntax for `src` / `dst`
 
 Same as NFQL — bare names (looked up across hosts/groups/networks),
-`host:NAME[:IFACE]`, `group:NAME`, `network:NAME`, and the reserved
-keywords `any` and `internet`. See
-[cartography.md](cartography.md#references-used-by-rules-and-nfql)
+`host:NAME[:IFACE]`, `group:NAME`, `network:NAME`, the DHCP
+projections `network:NAME.dhcp` / `network:NAME.static` (when the
+network has a [DHCP range](cartography.md#dhcp-networks)), and the
+family-specific reserved keywords `any4` / `any6` and `internet4` /
+`internet6`. See
+[cartography.md](cartography.md#reference-syntax-used-by-rules-and-nfql)
 for the full table.
+
+For example, "office DHCP clients may only reach internal DNS":
+
+```yaml
+rules:
+  - name: office-dhcp-dns-only
+    src: "office.dhcp"
+    src_service: "*"
+    dst: "network:dns-servers"
+    dst_service: 53/UDP
+```
+
+In the **Flow Matrix** page (`/rules`) the source / destination
+picker is autocomplete-driven — you click a suggestion, you don't
+type free text. The DHCP projections show up on demand: type a dot
+(`office.`) or the keyword `dhcp` / `static` and the picker offers
+`network:office.dhcp` and `network:office.static` for every network
+that has a declared range. Typing just `office` keeps the picker
+focused on the bare network, so the common case stays uncluttered.
 
 ---
 

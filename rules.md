@@ -47,6 +47,7 @@ rules:
     dst_iface: eth1
     dst_service: postgres
     enabled: true                  # default true; matcher skips disabled rules
+    tags: [critical, datastore]    # optional — free-form labels, searchable
 ```
 
 There is **no separate `protocol:` field**. The protocol is derived
@@ -68,12 +69,13 @@ know which side initiated, look at the session's `server_ip` and
 
 ### Optional fields
 
-| Field           | Type   | Default | Behavior                                                              |
-|-----------------|--------|---------|------------------------------------------------------------------------|
-| `description`   | string | empty   | Free-form, shown in the GUI and `rule show`.                          |
-| `src_iface`     | string | none    | Restrict a host reference to a single interface. Cannot mix with non-host kinds. |
-| `dst_iface`     | string | none    | Same on the dst side.                                                  |
-| `enabled`       | bool   | `true`  | When false, the rule lives in the DB but the matcher skips it. Use to stage a rule before turning it on. |
+| Field           | Type     | Default | Behavior                                                              |
+|-----------------|----------|---------|------------------------------------------------------------------------|
+| `description`   | string   | empty   | Free-form, shown in the GUI and `rule show`.                          |
+| `src_iface`     | string   | none    | Restrict a host reference to a single interface. Cannot mix with non-host kinds. |
+| `dst_iface`     | string   | none    | Same on the dst side.                                                  |
+| `enabled`       | bool     | `true`  | When false, the rule lives in the DB but the matcher skips it. Use to stage a rule before turning it on. |
+| `tags`          | []string | `[]`    | Free-form labels for grouping rules. Searchable in the Flow Matrix via `tag:foo`. Lowercased, deduplicated, and stored sorted. |
 
 ### The port/service field
 
@@ -160,6 +162,7 @@ dst_iface:       eth1
 dst_service:     postgres
 enabled:         true
 expansions:      24
+tags:            [critical, datastore]
 last_compile_error:
 ```
 
@@ -201,8 +204,71 @@ obserae-cli rule rm     backends-to-redis [--yes] [--dry-run]
 ### In the GUI
 
 The **Rules** page offers create / edit / enable-disable / delete
-actions with chip pickers for `src` and `dst`. See
+actions with chip pickers for `src`, `dst` and `tags`. See
 [web-gui.md](web-gui.md#rules).
+
+---
+
+## Searching rules
+
+The Flow Matrix search box understands a small set of operators.
+Multiple terms are AND-ed together; a term without a known prefix
+is a free-text search.
+
+| Term            | Matches a rule when…                                                                                          |
+|-----------------|---------------------------------------------------------------------------------------------------------------|
+| `tag:critical`  | …it carries the tag `critical`.                                                                               |
+| `proto:tcp`     | …its derived protocol is TCP (also `udp`, `icmp`, etc.).                                                      |
+| `port:443`      | …any of its expansions has source or destination port 443.                                                    |
+| `host:web-01`   | …its `src` or `dst` references `host:web-01`, **or** references a group / network whose membership contains `web-01`. |
+| `group:lan`     | …its `src` or `dst` literally references `group:lan`.                                                         |
+| `network:dmz`   | …its `src` or `dst` literally references `network:dmz`.                                                       |
+| `service:ssh`   | …`src_service` or `dst_service` contains `ssh` (substring, before catalogue resolution).                      |
+| `https`         | Free-text — matches name, description, src/dst refs, services, tags, **and** any resolved host name (so `web-01` finds rules that target `group:web` if `web-01` is a member). |
+
+Examples:
+
+```
+tag:critical                    # every rule tagged critical
+proto:tcp port:5432             # TCP rules touching port 5432
+host:srv-web service:https      # rules covering srv-web on https
+tag:edge tag:external           # rules tagged both edge AND external
+```
+
+Typing in the search input debounces 200 ms before re-querying,
+so the table follows your typing smoothly.
+
+---
+
+## Spotting redundant rules
+
+When two rules cover overlapping traffic — for example
+`group:web → internet4:443` (wide) and
+`host:web-01 → internet4:443` (narrow, a member of the group) —
+the daemon detects it and exposes it in the GUI.
+
+- In the **table**, the narrow rule's name shows a small `⊂ N`
+  badge meaning "covered by N other rule(s)". Click the row to see
+  who.
+- In the **drawer**, a new **Relations** section lists the rules
+  that cover the current one ("covered by") and the rules the
+  current one covers ("covers"). Each entry is a clickable button
+  that pivots the drawer to that rule.
+- When the current rule is **strictly covered** by another rule
+  that is still enabled, a *"Disable this redundant rule"* button
+  appears. Clicking it flips `enabled=false` — it never deletes,
+  and the wider rule keeps catching the traffic.
+
+The detector recognises three kinds of relations: `subset` (every
+match of A is also a match of B), `equal` (two rules cover the
+exact same flow set) and `overlap` (the rules intersect without
+containment). The full algorithm is described in
+[../docs/rules.md#rule-relations](../docs/rules.md#rule-relations).
+
+The relations are recomputed automatically after every rule
+mutation **and** after every cartography mutation — moving a host
+into a group is enough to surface new relations on the very next
+table reload.
 
 ---
 

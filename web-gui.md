@@ -200,10 +200,10 @@ queries from that doc all run unmodified on this page.
 The full lifecycle of a detection rule from one screen.
 
 ```
-NAME                       ENABLED  EXPANSIONS  MATCHES (24h)  LAST_ERROR
-webserver-to-database      yes              4              891
-public-https               yes            206         12,453
-backends-to-redis          no              24              0
+NAME                          TAGS                 ENABLED  EXPANSIONS  MATCHES (24h)  LAST_ERROR
+webserver-to-database         critical             yes              4              891
+public-https  ⊂ 1             edge external        yes            206         12,453
+backends-to-redis             datastore            no              24              0
 …
 ```
 
@@ -220,10 +220,33 @@ What you can do:
   `network:NAME.dhcp` / `network:NAME.static` for any network that
   has a DHCP range — type a dot (`office.`) or the keyword `dhcp` /
   `static` to reveal them; bare-name lookups stay uncluttered. The
-  port/service field
-  carries the protocol (`*/TCP`, `53/UDP`, or a catalogued service
-  name like `https`) — there is no separate protocol dropdown. A
-  live preview shows how many expansions the rule will compile to.
+  port/service field carries the protocol (`*/TCP`, `53/UDP`, or a
+  catalogued service name like `https`) — there is no separate
+  protocol dropdown. A live preview shows how many expansions the
+  rule will compile to.
+- **Tag a rule** — a chips picker at the bottom of the form.
+  Type a tag and press **Enter**, **comma** or **click outside**
+  to commit it as a chip; **×** on a chip removes it;
+  **Backspace** on an empty input removes the last chip. Each tag
+  gets a stable colour (hashed from its name), so the same tag
+  looks identical across the form, the table row, and the drawer.
+- **Search with operators** — the search box understands
+  `tag:critical`, `proto:tcp`, `port:443`, `host:srv-web`,
+  `group:lan`, `network:dmz` and `service:ssh`. Multiple terms
+  are AND-ed (`tag:edge port:22`). A plain word like `https`
+  matches across name, description, src/dst, services, tags and
+  any host the rule transitively touches via groups/networks. See
+  [rules.md#searching-rules](rules.md#searching-rules) for the
+  full grammar.
+- **Spot redundant rules** — when one rule fully covers another
+  (e.g. `group:lan → internet4:443` and `host:web → internet4:443`),
+  the narrower one gets a small `⊂ N` badge after its name meaning
+  "covered by N rules". Open its drawer for the dedicated
+  **Relations** section, which lists each parent (`subset` /
+  `equal`) and each child the rule covers (`overlap` too). When
+  the rule is strictly covered by another **enabled** rule, a
+  *"Disable this redundant rule"* button appears — clicking it
+  toggles `enabled=false`, it never deletes.
 - **Enable / disable** — toggle the row's switch. Disabled rules
   cost zero CPU per tick.
 - **Click a rule** to see its compiled expansions plus a chart of

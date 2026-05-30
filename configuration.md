@@ -146,6 +146,27 @@ enrichment:
   # for the first hourly tick. Default true.
   fetch_on_startup: true
 
+retention:
+  # Periodic purge of stale rows from `flows` and `sessions`. Off by
+  # default — the daemon never auto-evicts data unless you opt in.
+  # See lifecycle.md for the full guide; the GUI's Lifecycle page can
+  # also flip these knobs at runtime without restarting the daemon.
+  enabled: false
+  flows_max_age: 720h       # 30 days; 0 = do not purge flows
+  sessions_max_age: 2160h   # 90 days; 0 = do not purge sessions
+  interval: 1h              # sweep cadence
+
+backup:
+  # Periodic gzipped JSON snapshot of `flows`. Off by default. Files
+  # land under `directory` named flows-YYYYMMDDTHHMMSS.json.gz and
+  # are directly re-importable through the Lifecycle page's Flow I/O
+  # tab. Both rotation knobs (max_age, max_files) can apply together.
+  enabled: false
+  directory: "./data/backups"
+  interval: 24h             # cadence; runtime-immutable
+  max_age: 720h             # rotation by age; 0 = keep forever
+  max_files: 0              # rotation by count; 0 = no count cap
+
 logging:
   # 0 = INFO   (default — daemon-level events)
   # 1 = DEBUG  (per-flush, per-insert, per-tick)

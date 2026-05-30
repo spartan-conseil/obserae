@@ -42,6 +42,7 @@ alias obserae-cli='obserae-cli --socket /var/lib/obserae/run/obserae.sock'
 | `rule`          | CRUD on individual detection rules                            |
 | `matches`       | Read-only view of detection matches                           |
 | `query`         | Run an NFQL pipeline                                          |
+| `backup`        | List snapshots, preview and apply a point-in-time restore     |
 
 Most read commands accept `--json` for machine output. Most `rm`
 commands accept `--yes` (skip prompt) and `--dry-run` (preview only).

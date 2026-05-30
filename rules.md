@@ -64,7 +64,7 @@ know which side initiated, look at the session's `server_ip` and
 ### Required fields
 
 - **`name`** — unique across rules.
-- **`src`**, **`dst`** — both required; either can be `any4` / `any6` or `internet4` / `internet6` (family-specific keywords — see [cartography.md](cartography.md#reference-syntax-used-by-rules-and-nfql)).
+- **`src`**, **`dst`** — both required; either can be `any4` / `any6`, `internet4` / `internet6` or `internal4` / `internal6` (family-specific keywords — see [cartography.md](cartography.md#reference-syntax-used-by-rules-and-nfql)). `internal4` / `internal6` are the **exact complement** of `internet4` / `internet6` (the non-routable side: RFC1918, ULA, loopback, link-local, …).
 - **`src_service`**, **`dst_service`** — required; use `"*"` for "any port". See [The port/service field](#the-portservice-field).
 
 ### Optional fields
@@ -106,13 +106,13 @@ The protocol is **derived** from the two sides:
 - If both sides pin a protocol and they **conflict** (`*/TCP` on one
   side, `53/UDP` on the other), the rule is rejected.
 
-`internet4` / `internet6`, `any4` / `any6` and `network` references
-accept `*`, `*/PROTO` and `PORT/PROTO` (so `internet4 -> 53/UDP`
-works), but **not** a service name — service names are reserved for
-`host` / `group` references. With `*/PROTO` (or `*`), the compiler
-does **not** restrict the destination IPs to interfaces that bind a
-matching service, since there is no service name to look up: every
-CIDR in the endpoint is emitted as-is.
+`internet4` / `internet6`, `internal4` / `internal6`, `any4` / `any6`
+and `network` references accept `*`, `*/PROTO` and `PORT/PROTO` (so
+`internet4 -> 53/UDP` works), but **not** a service name — service
+names are reserved for `host` / `group` references. With `*/PROTO`
+(or `*`), the compiler does **not** restrict the destination IPs to
+interfaces that bind a matching service, since there is no service
+name to look up: every CIDR in the endpoint is emitted as-is.
 
 ### Reference syntax for `src` / `dst`
 
@@ -120,8 +120,9 @@ Same as NFQL — bare names (looked up across hosts/groups/networks),
 `host:NAME[:IFACE]`, `group:NAME`, `network:NAME`, the DHCP
 projections `network:NAME.dhcp` / `network:NAME.static` (when the
 network has a [DHCP range](cartography.md#dhcp-networks)), and the
-family-specific reserved keywords `any4` / `any6` and `internet4` /
-`internet6`. See
+family-specific reserved keywords `any4` / `any6`, `internet4` /
+`internet6` and `internal4` / `internal6` (the non-routable
+complement of `internet`). See
 [cartography.md](cartography.md#reference-syntax-used-by-rules-and-nfql)
 for the full table.
 

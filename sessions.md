@@ -117,7 +117,7 @@ time, top-down, until one method succeeds:
 
 | #  | Method               | Confidence | Fires when…                                                                          |
 |----|----------------------|-----------|---------------------------------------------------------------------------------------|
-| 1  | `tcp_handshake`      | HIGH      | TCP, SYN flag set on **exactly one** direction (asymmetric — half-open, scan, drop). |
+| 1  | `tcp_handshake`      | HIGH      | TCP. Two narrow sub-cases (see below): complete bidirectional handshake, or isolated client SYN with no peer activity. |
 | 2  | `cartography`        | HIGH      | One endpoint declares a service for `(port, proto)` in the cartography.              |
 | 3  | `privileged_port`    | MEDIUM    | One side ≤ 1023 and the other in `[32768, 65535]`.                                  |
 | 4  | `iana_port`          | MEDIUM    | One side matches a known IANA service (HTTP, SSH, …) on the right protocol.         |
@@ -128,12 +128,32 @@ time, top-down, until one method succeeds:
 that triggers on `role_conf = 'HIGH'` is far more reliable than
 one that fires on `LOW`, by design.
 
-> **About `tcp_handshake`.** NetFlow aggregates TCP flags with OR
-> across the flow window. A fully-established TCP connection sees
-> `SYN+ACK` accumulate in both directions, so the handshake test
-> abstains and the cascade falls through. The HIGH confidence is
-> reserved for the *asymmetric* case — exactly the
-> half-open / scan signature we want to catch first.
+> **About `tcp_handshake`.** NetFlow exporters aggregate TCP
+> flags with OR across the flow window, so an OR-aggregated
+> half-flow tells us almost nothing about which packet carried
+> which flag. The client side of a normal HTTPS session
+> accumulates `SYN|ACK|PSH|FIN|RST` in a single direction —
+> exactly the same signature as a server's reply. The handshake
+> step therefore only fires on the two patterns that survive OR
+> aggregation as unambiguous proof of the listener:
+>
+> - **Bidirectional clean handshake** — one side has the client
+>   SYN alone (`SYN && !ACK`), the other has `SYN+ACK`. The
+>   `SYN+ACK` side is the server.
+> - **Isolated client SYN, no reply at all** — one side has the
+>   client SYN, the other side has zero packets and zero flags.
+>   The empty side is the listener that never answered (scan or
+>   connect-without-reply).
+>
+> Every other signature is ambiguous and the step abstains. In
+> particular, **one-way captures** (exporter that only ships the
+> client→server *or* the server→client direction of an outbound
+> conversation) fall through to `cartography` / `privileged_port`
+> / `iana_port` / `lowest_port`. For a typical one-way HTTPS
+> capture (`443` vs an ephemeral port) the port-based methods
+> correctly designate `443` at MEDIUM confidence, which is what
+> the evidence actually warrants — the flag pattern alone never
+> proved the role.
 
 ---
 

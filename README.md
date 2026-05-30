@@ -139,6 +139,8 @@ Open the web GUI at <http://localhost:8080> to see the cockpit.
 | [nfql.md](nfql.md)                      | The NFQL query language — investigate traffic interactively        |
 | [sessions.md](sessions.md)              | How raw flows are folded into bidirectional, role-aware sessions   |
 | [enrichment.md](enrichment.md)          | Tag IPs with cloud-provider ranges (AWS / Azure / GCP)             |
+| [sources.md](sources.md)                | Label NetFlow exporters; manage cloud / threat-intel sources       |
+| [lifecycle.md](lifecycle.md)            | Storage usage, retention policy, periodic backups, manual I/O      |
 
 ### Running in production
 

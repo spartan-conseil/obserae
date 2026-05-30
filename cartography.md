@@ -86,8 +86,8 @@ groups:
 The daemon refuses any import that violates one of:
 
 - Names are unique across networks/hosts/groups.
-- The names `internet4`, `internet6`, `any4` and `any6` are
-  reserved keywords and cannot be redeclared.
+- The names `internet4`, `internet6`, `internal4`, `internal6`,
+  `any4` and `any6` are reserved keywords and cannot be redeclared.
 - A network's `cidr` parses to a canonical form (no host bits set).
   Any prefix length is accepted, including the default route
   `0.0.0.0/0` and `::/0`.
@@ -100,8 +100,11 @@ The daemon refuses any import that violates one of:
   their own per-family routability rule: `internet4` only accepts
   a publicly-routable IPv4 (no RFC1918, loopback, link-local,
   CGNAT, multicast, reserved); `internet6` only accepts a global
-  unicast IPv6 (no ULA, loopback, link-local, multicast). `any4` /
-  `any6` accept any address of the matching family.
+  unicast IPv6 (no ULA, loopback, link-local, multicast).
+  `internal4` / `internal6` are the **exact complement** — they
+  only accept the non-routable addresses of their family (RFC1918 /
+  ULA, loopback, link-local, etc.). `any4` / `any6` accept any
+  address of the matching family.
 - Service name is non-empty and unique on its host.
 - A service's `protocol` is one of: `TCP`, `UDP`, `ICMP`, `IGMP`,
   `GRE`, `AH`, `ESP`, `OSPF`, `SCTP`, `ICMPv6`. Names are
@@ -162,6 +165,14 @@ The **Cartography** page is a live interactive graph. Right-click
 any node for create / rename / delete actions, or right-click the
 empty canvas to create a new entity. See
 [web-gui.md](web-gui.md#cartography).
+
+The **Orphan IPs** drawer (top-right toolbar button) lists every IP
+seen in traffic over the last 24 hours that has no interface yet.
+A small switch in the drawer header — labelled **All IPs** /
+**Declared only** — lets you hide the rows tagged
+`outside known CIDRs` and focus on the IPs that already fall inside
+one of your declared networks (the easiest ones to adopt). The
+filter is session-only: leaving the page resets it to "All IPs".
 
 ---
 
@@ -287,6 +298,8 @@ compared to `INET` columns accept the same grammar:
 | `any6`                     | Reserved keyword: every IPv6 address (`::/0`)                 |
 | `internet4`                | Public unicast IPv4 — `0.0.0.0/0` minus RFC1918, loopback, link-local, CGNAT, multicast and reserved ranges |
 | `internet6`                | Public unicast IPv6 — `::/0` minus ULA (`fc00::/7`), loopback, link-local (`fe80::/10`), multicast and IPv4-mapped ranges |
+| `internal4`                | Non-routable IPv4 — the **exact complement** of `internet4` (RFC1918, loopback, link-local, CGNAT, multicast, reserved) |
+| `internal6`                | Non-routable IPv6 — the **exact complement** of `internet6` (ULA, loopback, link-local, multicast, mapped) |
 | `host:NAME`                | Every interface IP of the named host                         |
 | `host:NAME:IFACE`          | One specific interface IP                                    |
 | `group:NAME`               | Every interface IP of every member host (recursive)          |
@@ -297,13 +310,20 @@ compared to `INET` columns accept the same grammar:
 | `NAME:IFACE` (bare)        | Same as `host:NAME:IFACE`                                    |
 
 The reserved keywords are **family-specific**: `internet4` /
-`internet6` and `any4` / `any6` each expand to one IP family only.
-There is no bare `internet` or `any` keyword that spans both — if
-you need both families, declare two rules (or two NFQL clauses)
-using `internet4` and `internet6` side by side. The keyword
-definitions are evaluated by the same code path in the rule engine
-and the NFQL planner, so a rule and a query that both reference
-`internet4` see the exact same CIDR set.
+`internet6`, `internal4` / `internal6` and `any4` / `any6` each
+expand to one IP family only. There is no bare `internet` /
+`internal` / `any` keyword that spans both — if you need both
+families, declare two rules (or two NFQL clauses) using the v4 and
+v6 variants side by side. The keyword definitions are evaluated by
+the same code path in the rule engine and the NFQL planner, so a
+rule and a query that both reference `internet4` (or `internal4`)
+see the exact same CIDR set.
+
+`internal4` / `internal6` are the **exact complement** of `internet4`
+/ `internet6` within their family: every routable address satisfies
+one, every non-routable address satisfies the other, never both. Use
+`internal4` to say "anything on the LAN" without spelling out the
+RFC1918 / loopback / link-local CIDRs.
 
 ---
 

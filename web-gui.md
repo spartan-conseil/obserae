@@ -22,7 +22,8 @@ looking at.
 │ ◫ Sessions │                  Page content                           │
 │ ✶ Query    │                                                         │
 │ ⚑ Rules    │                                                         │
-│ ⚙ Data     │                                                         │
+│ ⇅ Sources  │                                                         │
+│ ⧗ Lifecycle│                                                         │
 │ ⚒ Simul.   │                                                         │
 └────────────┴─────────────────────────────────────────────────────────┘
 ```
@@ -105,6 +106,12 @@ What you can do on this page:
   over the last 24h. Click the hexagon to open a dedicated drawer
   with the pool bounds and the live leases (see
   [cartography.md](cartography.md#dhcp-networks)).
+- **Orphan IPs drawer** (toolbar button) lists every IP seen in
+  traffic but not yet declared as an interface. A small switch in
+  the drawer header — **All IPs** / **Declared only** — hides the
+  rows tagged `outside known CIDRs` so you can focus on candidates
+  already covered by one of your networks. The switch state is
+  session-only (does not survive a tab reload).
 - **Right-click a node** for the create / rename / delete actions.
 - **Box-select** several nodes to group them in one click.
 - **Wheel to zoom**, drag the canvas to pan.
@@ -263,31 +270,81 @@ The rule model is described in [rules.md](rules.md).
 
 ---
 
-## Data
+## Sources
 
-Bulk import / export plus IP enrichment.
+Everything that *produces data* for obserae lives here: the NetFlow
+exporters (the devices that emit flows), the cloud-provider
+attribution sources, and the threat-intelligence feeds. Three tabs.
+See [sources.md](sources.md) for the full walkthrough.
 
-### Import / export
+### Exporters tab
 
-- **Export topology** → downloads a YAML you can edit and re-import.
-- **Export rules** → same, for detection rules.
-- **Import topology / rules** → drag-and-drop a YAML file. Validation
-  runs first; the GUI shows what would change before you confirm.
+A table with one row per NetFlow-emitting device the daemon has
+seen. The IP is the `sampler_address` carried on every flow; the
+**name**, **equipment type** and **details** columns are yours to
+fill in — once labelled, the rest of the GUI (Sessions, Cartography,
+Investigation) shows the friendly name instead of the raw IP.
 
-### IP enrichment
+The list auto-refreshes from observed traffic every 5 minutes; a
+**Rescan** button forces a sweep on demand if you just added a new
+device.
 
-Tag the IPs you see with cloud-provider metadata so a session to
-`52.x.x.x` shows up as "AWS / us-east-1" instead of an opaque IP.
+### Cloud attribution tab
 
-The page lists every source (AWS, Azure, Google) with:
+The master toggle for IP enrichment plus the list of cloud-provider
+sources (AWS, Azure, Google). When on, every IP gets a discreet
+cloud-provider badge across the GUI.
 
-- An **enable/disable toggle** per source.
-- The **last refresh time** and current range count.
-- A **Refresh now** button — useful right after you enable a source.
+### Threat intelligence tab
 
-When enrichment is on, IPs across the GUI render with a small badge
-that hovers to show the provider details. The full mechanism is
-described in [enrichment.md](enrichment.md).
+Same controls for open-source TI feeds (FireHOL …). Hits surface as
+a red triangle on Sessions and Cartography.
+
+The full enrichment mechanism is described in
+[enrichment.md](enrichment.md).
+
+---
+
+## Lifecycle
+
+Everything that *manages data over time*: retention, backup,
+storage footprint, and the manual import / export controls. Four
+tabs. See [lifecycle.md](lifecycle.md) for the full walkthrough.
+
+### Storage tab
+
+The on-disk footprint: DuckDB file size, free disk space on the
+mount, byte totals for the parquet buffer and backup directories.
+Polled every 10 seconds — these values move slowly. Use this tab
+to size the retention policy below, or to confirm the backup
+directory isn't ballooning past its rotation cap.
+
+### Retention tab
+
+Periodic purge of stale rows from `flows` and `sessions`. **Off by
+default** — flip the master switch only after you have picked at
+least one max age. Changes take effect on the next sweep; no
+restart needed.
+
+### Backup tab
+
+Periodic gzipped JSON dump of the `flows` table. Files are named
+`flows-YYYYMMDDTHHMMSS.json.gz` and land under the configured
+directory. Rotation enforces the two limits you set (max age and/or
+max files). A **Backup now** button writes one snapshot
+immediately; the file listing below refreshes as soon as it lands.
+
+The exact format is identical to what the import below accepts —
+so a backup file round-trips cleanly into a fresh daemon for
+forensic replay.
+
+### Flow I/O tab
+
+Manual export and import of the `flows` table as a hand-editable
+JSON array. The import accepts both `.json` and `.json.gz` (gzip
+detection is automatic). The **time mode** radio controls whether
+timestamps are kept absolute or shifted so the newest record lands
+at "now" — useful for replaying a fixture captured days ago.
 
 ---
 

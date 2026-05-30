@@ -220,6 +220,7 @@ picks the right interpretation:
 | `"10.0.0.0/8"`            | The exact CIDR (IPv4 or IPv6, e.g. `"2001:db8::/64"`; use `WITHIN` for containment) |
 | `"any4"` / `"any6"`       | Reserved: every IP of one family (`0.0.0.0/0` or `::/0`) |
 | `"internet4"` / `"internet6"` | Public unicast of one family (excludes RFC1918 / ULA, loopback, link-local, CGNAT, multicast, reserved) |
+| `"internal4"` / `"internal6"` | Non-routable IPs of one family — the **exact complement** of `"internet4"` / `"internet6"` (RFC1918 / ULA, loopback, link-local, CGNAT, multicast, reserved, mapped) |
 | `"network:NAME"`          | The named network's CIDR                               |
 | `"NAME.dhcp"`             | The network's DHCP pool only (needs a [DHCP range](cartography.md#dhcp-networks)) |
 | `"NAME.static"`           | The network's CIDR **minus** its DHCP pool             |
@@ -252,10 +253,16 @@ FROM flows | WHERE ip == "2001:db8::1"
 FROM sessions | WHERE server_ip WITHIN "2001:db8::/64"
 ```
 
-The reserved keywords are **family-specific**: `"internet4"` and
-`"any4"` only match IPv4 addresses, `"internet6"` and `"any6"` only
-IPv6. To match both families in one query, combine them — e.g.
-`WHERE ip == "internet4" OR ip == "internet6"`.
+The reserved keywords are **family-specific**: `"internet4"`,
+`"internal4"` and `"any4"` only match IPv4 addresses; `"internet6"`,
+`"internal6"` and `"any6"` only IPv6. To match both families in one
+query, combine them — e.g. `WHERE ip == "internet4" OR ip == "internet6"`.
+
+`"internal4"` / `"internal6"` are the exact complement of their
+`internet` twin: every routable v4 IP satisfies `"internet4"`, every
+non-routable v4 IP satisfies `"internal4"`, and the two never overlap.
+Use it to write "anything on the LAN" without spelling out every
+RFC1918 / loopback / link-local CIDR.
 
 ---
 

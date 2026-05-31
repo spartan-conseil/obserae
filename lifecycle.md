@@ -52,6 +52,23 @@ opt in. That's intentional: a fresh install accumulates so an
 analyst can investigate yesterday's flows on day three. Once you
 have a sense of the daily volume, come back here and turn it on.
 
+The tab has two parts: a **Status** section at the top (what's
+happening) and a **Policy** section below (the age thresholds).
+
+### Status
+
+- **Clean up now** — run a cleanup immediately, without waiting for
+  the next scheduled sweep. Useful right after lowering a max-age, or
+  to reclaim space on demand.
+- **Last cleanup** — when the last sweep ran ("just now", "2 hours
+  ago"…) and what it removed (flows, sessions, duration).
+- **Next automatic cleanup** — when the next scheduled sweep will run
+  (only when retention is ON). When it's off, the line reminds you to
+  turn it on to sweep on a schedule.
+
+A manual "Clean up now" does **not** reschedule the periodic sweep —
+the automatic cadence keeps its own clock.
+
 ### The master toggle
 
 - **Retention OFF** — the runner ticks but does nothing.
@@ -77,13 +94,13 @@ restart the daemon — but they also don't get persisted back to
 the YAML. For changes that should survive a daemon restart,
 edit `configs/obserae.yaml` directly.
 
-### Last sweep
+### Sweep counters
 
-Below the form, the GUI surfaces the counters from the most
-recent sweep: how many rows were deleted from each table, and
-how long the sweep took. A long sweep (> 1 second) briefly
+The **Last cleanup** line in the Status section shows the counters
+from the most recent sweep: how many rows were deleted from each
+table, and how long the sweep took. A long sweep (> 1 second) briefly
 stalls flow ingestion — the daemon log emits a `WARN` line when
-that happens, mirrored here.
+that happens.
 
 > **The first sweep on a long-running daemon can be large.** If
 > you enable retention on a daemon that has been running for

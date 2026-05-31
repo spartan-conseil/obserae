@@ -174,6 +174,33 @@ A small switch in the drawer header — labelled **All IPs** /
 one of your declared networks (the easiest ones to adopt). The
 filter is session-only: leaving the page resets it to "All IPs".
 
+### Colours and icons
+
+Colour, icon and OS badge are chosen in the entity's **configuration
+form** — open it from the **Edit** button in the entity's drawer, or
+right-click the node and pick *Edit* (when creating a new
+host/network/group you can set them straight away). In the form you can:
+
+- **Pick a colour** — choose a swatch to tint the node. Related hosts
+  get a shared auto-colour by default; a custom swatch overrides it.
+- **Set an icon** — give the node an icon so the map reads at a glance
+  (a server, a firewall, a database…). In the **Icon** section, type a
+  search term to browse matching icons and click one to apply it, or
+  type an id directly in the form `mdi:server`. Icons come from the
+  [Iconify](https://icon-sets.iconify.design/) collections, so the id
+  is `set:name` (e.g. `mdi:router`, `logos:docker`). Use **Clear** to
+  remove it.
+- **Set an OS badge** *(hosts only)* — a small second icon shown at the
+  **bottom-right** of the host, to mark its operating system
+  (`logos:ubuntu`, `logos:microsoft-windows-icon`, `simple-icons:apple`…).
+  It keeps the logo's own colours. Search by name (try "ubuntu",
+  "windows", "linux") in the **OS badge** section.
+
+Everything takes effect when you **Save** the form. These are visual
+only — they don't change how rules or NFQL match — and all are undoable
+with **Ctrl+Z**. They are saved with the cartography, so exporting and
+re-importing your YAML keeps every colour, icon and OS badge.
+
 ---
 
 ## DHCP networks

@@ -19,12 +19,14 @@ looking at.
 ├────────────┬─────────────────────────────────────────────────────────┤
 │ ▣ Cockpit  │                                                         │
 │ ✦ Carto    │                                                         │
-│ ◫ Sessions │                  Page content                           │
+│ ▦ Flow Mtx │                  Page content                           │
+│ ≈ Simul.   │                                                         │
+│ ◫ Sessions │                                                         │
 │ ✶ Query    │                                                         │
-│ ⚑ Rules    │                                                         │
+│ ◆ Rules    │                                                         │
+│ ◬ Detection│                                                         │
 │ ⇅ Sources  │                                                         │
 │ ⧗ Lifecycle│                                                         │
-│ ⚒ Simul.   │                                                         │
 └────────────┴─────────────────────────────────────────────────────────┘
 ```
 
@@ -202,9 +204,12 @@ queries from that doc all run unmodified on this page.
 
 ---
 
-## Rules
+## Flow Matrix
 
-The full lifecycle of a detection rule from one screen.
+The full lifecycle of a connectivity **detection rule** from one screen
+(in the sidebar this page is labelled **Flow Matrix**). These rules
+describe which hosts *may* talk to which — a different feature from the
+NFQL **Rules** (alerting) page below.
 
 ```
 NAME                          TAGS                 ENABLED  EXPANSIONS  MATCHES (24h)  LAST_ERROR
@@ -267,6 +272,59 @@ cartography mutation removed an entity the rule referenced. Fix
 the cartography (or the rule) and re-import to clear the error.
 
 The rule model is described in [rules.md](rules.md).
+
+---
+
+## Rules (alerting)
+
+NFQL-based alert rules. Each rule runs a **saved NFQL query** (authored
+on the Query page) on its own schedule and raises an alert when a
+condition is met. The list mirrors the Flow Matrix — click a row to open
+its panel.
+
+```
+NAME              QUERY              CONDITION   SEVERITY  CADENCE  LAST EXEC   STATUS
+ssh-from-internet ssh-watch          presence    high      30s      83 ms       enabled
+scan-detector     distinct-dst-ports threshold>100 medium  1m       412 ms ⚠    enabled
+new-external-asn  egress-asn         first_seen  low       5m       21 ms       enabled
+log-collector-up  collector-flows    heartbeat   critical  1m       12 ms       enabled
+```
+
+What you can do:
+
+- **Create / edit a rule**: find a saved query with the **searchable
+  picker** (type a word, or `name:` / `tag:` to target a field), then
+  set a **condition** (presence / threshold / first seen / heartbeat), a
+  **severity**, a **cadence** (10 s … 1 h) and a **cooldown**, and an
+  optional remediation note.
+- **Sort by Last exec** to find slow ("heavy") rules — the column is
+  colour-coded and a slow run is flagged.
+- Open a rule's panel to see its **recent runs** (when each ran, whether
+  it fired, row count, duration, and a sample of the result).
+
+The full model is described in [alerting.md](alerting.md).
+
+---
+
+## Detection
+
+The dashboard of alerts your rules raised. New alerts appear live.
+
+```
+FIRED                SEVERITY  RULE               MATCHED  STATUS
+2026-05-31 09:14:02  high      ssh-from-internet  3        new
+2026-05-31 09:02:41  medium    scan-detector      128      ack
+2026-05-30 23:51:10  critical  log-collector-up   0        closed
+```
+
+What you can do:
+
+- **Filter** by severity, status, rule, or time window.
+- **Advance status**: new → acknowledged → closed.
+- **Delete** alerts (single or in bulk).
+- Open an alert to see the **rows that matched** and jump to its rule.
+
+See [alerting.md](alerting.md) for the workflow end to end.
 
 ---
 

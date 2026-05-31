@@ -91,6 +91,15 @@ matcher:
   # transaction (join closed sessions × rule expansions).
   interval: 30s
 
+alerts:
+  # NFQL-based alerting. Each rule runs on its own cadence; poll_interval
+  # is just how often obserae checks which rules are due. See alerting.md.
+  poll_interval: 10s
+  tick_timeout: 120s
+  eval_max_rows: 10000
+  runs_per_rule: 50
+  budget_factor: 0.8
+
 sessions:
   # Cadence of the session-consolidation engine.
   interval: 10s

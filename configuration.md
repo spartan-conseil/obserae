@@ -145,6 +145,15 @@ correlation:
   # exporters flush the same conversation tens of seconds apart, so this
   # absorbs inter-exporter clock skew. 0 requires a strict overlap.
   window: 60s
+  # How far back the correlator looks for an already-closed peer. A peer
+  # closed before (batch flow start − window − horizon) cannot overlap,
+  # so it is skipped — this is what keeps the correlation step's cost
+  # bounded (independent of how many sessions the table holds) instead of
+  # scanning all history. Default 16m (≈ hard_timeout + grace + margin).
+  # Raise it only if exporters flush the SAME conversation more than this
+  # far apart and you see groups fragmenting; lower it on a very busy,
+  # tightly-synchronised fleet to scan even less.
+  horizon: 16m
 
 enrichment:
   # Number of distinct IPs the insert-time enrichment resolver
@@ -164,6 +173,12 @@ retention:
   flows_max_age: 720h       # 30 days; 0 = do not purge flows
   sessions_max_age: 2160h   # 90 days; 0 = do not purge sessions
   interval: 1h              # sweep cadence
+  # Rows deleted per statement. The runner loops until the set is
+  # drained, so this never caps the purge — it only bounds how long any
+  # single DELETE holds the writer connection (shared with ingestion).
+  # Purging sessions also cascades to sessions_correlation (orphans) and
+  # ages out sessions_dead_letter with the same cutoff.
+  batch_size: 50000
 
 backup:
   # Periodic gzipped JSON snapshot of `flows`. Off by default. Files
@@ -220,7 +235,7 @@ The daemon refuses to start if any of these fails:
 - `sessions.interval`, `sessions.grace`, `sessions.hard_timeout` ≤ 0.
 - `sessions.max_open_ksessions` or `sessions.recovery_window` ≤ 0.
 - Any `sessions.idle.*` value ≤ 0.
-- `correlation.window` < 0 (when `correlation.enabled`).
+- `correlation.window` < 0 or `correlation.horizon` < 0 (when `correlation.enabled`).
 - `enrichment.cache_size` ≤ 0.
 - `logging.verbosity` < 0.
 

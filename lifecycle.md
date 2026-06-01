@@ -75,7 +75,11 @@ the automatic cadence keeps its own clock.
   Flipping it on is the activation switch.
 - **Retention ON** — every interval (1 hour by default) the
   runner deletes flows older than `flows_max_age` and sessions
-  older than `sessions_max_age`.
+  older than `sessions_max_age`. Purging a session also removes its
+  correlation overlay row and ages out the dead-letter audit trail, so
+  no orphan rows are left behind. Deletes run in bounded batches
+  (`retention.batch_size`, default 50 000) so a large backlog is cleared
+  without holding up flow ingestion for the whole sweep.
 
 ### The two ages
 

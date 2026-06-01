@@ -49,7 +49,7 @@ across cartography entities and rules.
 The landing page. Designed so an analyst opening obserae in the
 morning knows within 5 seconds whether anything is wrong.
 
-Four zones:
+Six zones:
 
 1. **Health strip** — five live counters: flows/s, active sessions,
    half-open sessions, closed sessions, total NetFlow records since
@@ -78,6 +78,18 @@ Four zones:
    - **Enrichment LRU** — how full the insert-time enrichment
      resolver's cache is. A full cache only costs re-resolutions,
      not correctness.
+6. **DB activity** — a live "ps for the database". obserae writes
+   through a **single** database connection, so when ingestion slows
+   the question is always "what is holding that connection?". This pane
+   lists the operations in flight (longest first; the running write is
+   flagged `RUNNING`). The header shows `in-use`, a live **wait Δ** (how
+   long the writer spent queued during the last interval — it falls back
+   to zero when there's no contention) and, muted, the cumulative
+   "total since start" counters. A **Writer contention** banner appears
+   only when that per-interval wait crosses the threshold — *not* when
+   the cumulative total is high (that counter only ever grows and is not
+   an alarm). It's the GUI twin of `obserae-cli ps` (see
+   [cli.md](cli.md#ps)); reach for it the moment flows/s drops.
 
 The Cockpit is the right place to start every shift.
 

@@ -312,6 +312,14 @@ double-counting) and a `coherence_pct` (how much the exporters agree on
 the packet total). `sampler_count > 1` isolates the genuine multi-source
 consolidations. Toggle and tune via the `correlation` config block.
 
+Correlation only matches a freshly-closed session against peers closed
+**recently** — within `correlation.horizon` (default 16m), the window
+that bounds how long two exporters can flush the same conversation
+apart. That recency floor is what keeps correlation fast no matter how
+many sessions the table has accumulated. If you run exporters whose
+export timers are *very* far apart and see one conversation split into
+several `correlation_id`s, raise `correlation.horizon`.
+
 ---
 
 ## Where to next

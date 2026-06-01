@@ -42,6 +42,7 @@ alias obserae-cli='obserae-cli --socket /var/lib/obserae/run/obserae.sock'
 | `rule`          | CRUD on individual detection rules                            |
 | `matches`       | Read-only view of detection matches                           |
 | `query`         | Run an NFQL pipeline                                          |
+| `ps`            | Live database activity (in-flight ops + writer queue)         |
 | `backup`        | List snapshots, preview and apply a point-in-time restore     |
 
 Most read commands accept `--json` for machine output. Most `rm`
@@ -323,6 +324,53 @@ The default table output decodes a few well-known integer columns
 into their canonical names (`protocol` → `TCP`, `tcp_flags` →
 `SYN,ACK`). `--json` keeps raw numeric values so downstream filters
 keep working.
+
+---
+
+## `ps`
+
+A `top`-like view of what the database is doing right now — the first
+thing to reach for when ingestion feels slow. obserae serialises every
+write on a **single** database connection, so a stall always has one
+culprit: the operation currently holding that connection.
+
+```sh
+obserae-cli ps                 # one snapshot
+obserae-cli ps --watch 1s      # refresh every second (Ctrl-C to stop)
+obserae-cli ps --json          # machine-readable
+```
+
+```text
+writer pool: in_use=1 open=1  waits since start (cumulative): count=12 total=4.231s
+
+IN-FLIGHT (2)
+  POOL    ELAPSED      STATE  OP
+  writer  3.120s       RUNNING sessions.correlator.assign_batch
+  reader  12ms         running query.nfql
+
+RECENT (8, slowest first)
+  POOL    ELAPSED      ERR    OP
+  writer  890ms               inserter.parquet
+  writer  120ms               enrichment.insert_batch
+```
+
+- **IN-FLIGHT** lists operations executing now, longest first. The first
+  `writer` row is flagged `RUNNING` — it is the one holding the single
+  writer connection. **This is the real-time "stalling now" signal:** a
+  `RUNNING` write whose `ELAPSED` keeps climbing is the operation pinning
+  ingestion. `reader` rows are read-only queries (NFQL, cockpit) running
+  concurrently on the reader pool.
+- The `waits since start` counters are **cumulative since the daemon
+  started** (`sql.DBStats`) — they only ever grow, because every
+  goroutine takes its turn on the single writer connection (normal
+  serialisation). A large total is **not** an alarm; judge contention
+  from the `RUNNING` op's elapsed time, not from this counter. The
+  Cockpit's DB-activity pane adds a per-interval `wait Δ` that *does*
+  fall back to zero, and only raises a banner on real contention.
+- **RECENT** is a ring of the last completed operations, slowest first,
+  so a spike that already finished is still visible. `✗` marks a failure.
+
+The same data drives the **DB activity** pane on the Cockpit page.
 
 ---
 

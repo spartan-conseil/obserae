@@ -34,11 +34,11 @@ retention policy below.
 
 ### Working directories section
 
-- **Parquet buffer** — temporary parquet files written by the
-  ingestion buffer between flushes. Should hover near zero
-  (the inserter deletes each file after a successful INSERT). A
-  growing buffer points at a stuck inserter — check the daemon
-  log for failed inserts.
+- **Parquet buffer** — the **flow store**: flows are written here as
+  partitioned parquet (`YYYYMMDD/HH`, UTC) and queried in place; this
+  directory holds your retained flow history, not just a transient buffer.
+  It grows with traffic and shrinks when retention drops old day-partitions.
+  (A background compactor merges each elapsed hour into a single file.)
 - **Backup directory** — cumulative size and file count of every
   backup snapshot currently on disk. Cross-check with the **Files
   on disk** list in the Backup tab.
@@ -73,13 +73,13 @@ the automatic cadence keeps its own clock.
 
 - **Retention OFF** — the runner ticks but does nothing.
   Flipping it on is the activation switch.
-- **Retention ON** — every interval (1 hour by default) the
-  runner deletes flows older than `flows_max_age` and sessions
-  older than `sessions_max_age`. Purging a session also removes its
-  correlation overlay row and ages out the dead-letter audit trail, so
-  no orphan rows are left behind. Deletes run in bounded batches
-  (`retention.batch_size`, default 50 000) so a large backlog is cleared
-  without holding up flow ingestion for the whole sweep.
+- **Retention ON** — every interval (1 hour by default) the runner evicts
+  flows older than `flows_max_age` and sessions older than
+  `sessions_max_age`. Flows and archived sessions live in parquet, so
+  eviction simply **drops whole time-partitions** (near-instant, never
+  competing with live ingestion). Purging a session also removes its
+  correlation overlay row and ages out the dead-letter audit trail, so no
+  orphan rows are left behind.
 
 ### The two ages
 

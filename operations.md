@@ -19,13 +19,15 @@ obserae owns three areas of disk in a production install:
 
 /var/lib/obserae/                  # the daemon owns everything below
    db/obserae.duckdb               # the database file
-   parquet/                        # short-lived parquet buffer
+   parquet/                        # the flow store (parquet, YYYYMMDD/HH, UTC)
+   sessions_archive/               # the closed-session archive (parquet, same layout)
+   consolidated_archive/           # the frozen-conversation archive (parquet, same layout)
    run/obserae.sock                # the control socket (mode 0600)
 ```
 
-`parquet/` grows under load and shrinks again as files get
-inserted. Empty there is the steady state — files accumulate when
-the inserter is behind.
+`parquet/` is the flow store: flows are kept here as partitioned
+parquet (`YYYYMMDD/HH/`, UTC) and queried in place. It grows with traffic and
+shrinks when retention drops old day-partitions — it is not a transient buffer.
 
 ---
 
@@ -223,7 +225,7 @@ Useful checks to script:
 |-----------------------------------------------------------------------|------------------------------------------------------------------------------------|
 | `flow_count` not increasing                                           | Exporter not sending, port firewalled, or pipeline stuck                          |
 | `flow_count: 0` with `packets_awaiting_template > 0`                  | NetFlow v9 cold-start blackout: packets arrive but no template is known. Known templates persist across restarts, so this means a brand-new exporter — wait for its next refresh or force it with `configctl netflow stop && configctl netflow start` on OPNsense. |
-| Parquet files older than 1 minute in `buffer.directory`               | Inserter is stuck (DuckDB or disk problem)                                        |
+| `buffer.directory` growing while retention is on                      | Flows are the parquet store — confirm retention is dropping old day partitions (Lifecycle tab), or the disk is full |
 | Any rule with non-empty `last_compile_error`                          | Cartography mutation broke a rule reference                                       |
 | Steady growth in matches for an alert rule                            | Detection actually firing                                                         |
 | `sessions open (live)` near its cap, or `sessions evicted` climbing   | The in-memory session map is under pressure — oldest sessions are being force-closed (`capacity`). A scan/flood, or `sessions.max_open_ksessions` is too small. |
@@ -274,18 +276,18 @@ Daemon not running, or the configured socket path differs from the
 CLI's. Check `sudo systemctl status obserae` and the
 `control.socket` setting.
 
-### Parquet files pile up
+### The flow store keeps growing
 
-The inserter is behind. Most likely cause: the DuckDB file is on a
-slow or full disk, or another process holds it open.
+`parquet/` is the retained flow history, so it grows with traffic and only
+shrinks when **retention is enabled** and dropping old day partitions.
+With retention off it is uncapped — enable retention, or monitor disk usage:
 
 ```sh
-lsof | grep obserae.duckdb
 df -h /var/lib/obserae
+du -sh /var/lib/obserae/parquet /var/lib/obserae/sessions_archive /var/lib/obserae/consolidated_archive
 ```
 
-The buffer directory is uncapped — operators are expected to
-monitor disk usage. A `df` threshold alert is the right tool.
+A `df` threshold alert is the right tool.
 
 ### A rule fires too much / too little
 

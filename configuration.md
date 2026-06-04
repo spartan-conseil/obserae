@@ -100,6 +100,17 @@ alerts:
   runs_per_rule: 50
   budget_factor: 0.8
 
+outputs:
+  # Delivery of alerts to webhook / Gotify destinations. The destinations
+  # are managed on the Outputs page; these knobs tune how the background
+  # dispatcher retries. See outputs.md.
+  dispatch_interval: 5s
+  attempt_timeout: 10s
+  max_attempts: 10
+  backoff_base: 5s
+  backoff_max: 1h
+  delivery_retention: 168h   # forget delivered/dead rows after 7 days
+
 sessions:
   # Cadence of the session-consolidation engine.
   interval: 10s

@@ -19,15 +19,18 @@ obserae owns three areas of disk in a production install:
 
 /var/lib/obserae/                  # the daemon owns everything below
    db/obserae.duckdb               # the database file
-   parquet/                        # the flow store (parquet, YYYYMMDD/HH, UTC)
+   parquet/                        # the flow store (parquet, env=…/year=…/…/hour=…, UTC)
    sessions_archive/               # the closed-session archive (parquet, same layout)
    consolidated_archive/           # the frozen-conversation archive (parquet, same layout)
+   enrichment_ranges/              # cloud/threat CIDR catalogue (parquet, type=…/source=…)
+   ip_enrichment/                  # insert-time IP classifications (parquet, same time layout)
    run/obserae.sock                # the control socket (mode 0600)
 ```
 
-`parquet/` is the flow store: flows are kept here as partitioned
-parquet (`YYYYMMDD/HH/`, UTC) and queried in place. It grows with traffic and
-shrinks when retention drops old day-partitions — it is not a transient buffer.
+`parquet/` is the flow store: flows are kept here as Hive-partitioned
+parquet (`env=default/year=…/…/hour=…`, UTC) and queried in place. It grows with
+traffic and shrinks when retention drops old hour-partitions — it is not a
+transient buffer. Time-window queries prune to just the matching partitions.
 
 ---
 

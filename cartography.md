@@ -166,6 +166,22 @@ any node for create / rename / delete actions, or right-click the
 empty canvas to create a new entity. See
 [web-gui.md](web-gui.md#cartography).
 
+#### Cloning a host
+
+A host's drawer has a **Clone** button — handy for a cluster of
+machines that share the same interfaces and services and differ only
+by name and IP. It opens a small form **pre-filled** with:
+
+- a **suggested name**: the trailing number is incremented keeping its
+  padding (`web-01` → `web-02`), or `-01`, `-02`… is appended when the
+  name has no number (`proxy` → `proxy-01`);
+- for each interface, the **next free IP** above the source's, within
+  the same network.
+
+Adjust the name or any IP if you like, then **Clone**. The copy carries
+over every interface, service, interface binding, group membership and
+the source's colour/icon, and is selected on the graph once created.
+
 The **Orphan IPs** drawer (top-right toolbar button) lists every IP
 seen in traffic over the last 24 hours that has no interface yet.
 A small switch in the drawer header — labelled **All IPs** /

@@ -32,16 +32,41 @@ When **Disk free** is the same order of magnitude as the
 DuckDB file, it's time to either widen the mount or tighten the
 retention policy below.
 
-### Working directories section
+### Backup directory section
 
-- **Parquet buffer** — the **flow store**: flows are written here as
-  partitioned parquet (`YYYYMMDD/HH`, UTC) and queried in place; this
-  directory holds your retained flow history, not just a transient buffer.
-  It grows with traffic and shrinks when retention drops old day-partitions.
-  (A background compactor merges each elapsed hour into a single file.)
-- **Backup directory** — cumulative size and file count of every
-  backup snapshot currently on disk. Cross-check with the **Files
-  on disk** list in the Backup tab.
+- **Snapshots** — cumulative size and file count of every backup snapshot
+  currently on disk. Cross-check with the **Files on disk** list in the Backup tab.
+
+### Parquet stores section
+
+All retained data lives in Hive-partitioned parquet stores on disk
+(`env=default/year=…/month=…/day=…/hour=…`, UTC — except the enrichment
+ranges, keyed by `type=…/source=…`). This section gives a SOC operator the
+state of each store **at a glance**. The header shows the **total parquet**
+size; then one card per store:
+
+- **Flows** — the raw flow history (queried in place; a background compactor
+  merges each elapsed hour into one file).
+- **IP enrichment** — the insert-time classification log.
+- **Sessions archive** / **Consolidated archive** — the cold tiers of the
+  session and consolidated-conversation tables.
+- **Enrichment ranges** — the cloud/threat-intel CIDR catalogue (per source).
+
+Each time-partitioned card shows:
+
+- **Size** and **file count**.
+- **Updated _N_ ago** — a freshness badge from the newest hour written
+  (green when recent, amber when stale — useful to spot a store that stopped
+  receiving data).
+- **Span** — oldest → newest partition, i.e. how far back the store reaches.
+- **Timeline** — a small bar chart of bytes written over time, at an adaptive
+  granularity: **hourly** (last 48 h) for a short history, **daily** (last 30
+  days) for longer ones. A caption under the bars names the granularity/window
+  and the two ticks show the first/last bucket. Gaps show as blanks, so you see
+  the temporal spread of the hiving and any missing hours/days at a glance.
+
+The Enrichment ranges card lists each source with its size instead of a
+timeline (it is a reference catalogue, not time-series data).
 
 ---
 

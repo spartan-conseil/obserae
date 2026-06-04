@@ -25,6 +25,7 @@ looking at.
 │ ✶ Query    │                                                         │
 │ ◆ Rules    │                                                         │
 │ ◬ Detection│                                                         │
+│ ⇨ Outputs  │                                                         │
 │ ⇅ Sources  │                                                         │
 │ ⧗ Lifecycle│                                                         │
 └────────────┴─────────────────────────────────────────────────────────┘
@@ -337,6 +338,28 @@ What you can do:
 - Open an alert to see the **rows that matched** and jump to its rule.
 
 See [alerting.md](alerting.md) for the workflow end to end.
+
+---
+
+## Outputs
+
+Export destinations for your alerts — **webhooks** and **Gotify**. Each
+output receives alerts at or above a minimum severity, optionally filtered
+by rule name or tag, and obserae delivers them reliably with automatic
+retry.
+
+What you can do:
+
+- **Add** a webhook (any URL, optional HMAC signing, custom headers and
+  body template) or a Gotify destination (server URL + app token).
+- **TLS** for internal endpoints: trust a custom CA certificate, or skip
+  verification (with an explicit insecure warning).
+- **Route** by minimum severity and optional rule name / tag.
+- **Send test** to confirm connectivity and signing before relying on it.
+- Watch **Recent deliveries** with per-attempt status (sent / failed /
+  dead).
+
+See [outputs.md](outputs.md) for the full reference.
 
 ---
 

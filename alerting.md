@@ -127,20 +127,20 @@ to take up too much room.
 
 ## Sharing rules between environments
 
-A rule needs its query to work — the two travel together. The **File**
-menu on the **Rules** page lets you move both at once as a single YAML
-file:
+A rule needs its query to work — the two travel together. They live as
+the **`alerting:`** block of the single configuration file you export and
+import from the **Config I/O** page (`⇄` in the sidebar):
 
-- **File ▸ Export YAML** downloads everything — all your saved queries
-  and all your rules — in one file you can keep in version control or
-  hand to another obserae.
-- **File ▸ Import YAML…** loads such a file. **Heads up: this replaces
-  all your current saved queries and rules** with the file's contents
-  (obserae asks you to confirm first). Your past alerts are kept — only
-  the queries and rules are swapped. If the file has a mistake, nothing
-  is changed and you get a clear error.
-- **File ▸ Validate file…** checks a file is correct without importing
-  it.
+- **Export configuration** downloads one file holding everything obserae
+  is configured with — including all your saved queries and rules — to
+  keep in version control or hand to another obserae.
+- **Import file…** loads such a file. If it carries an `alerting:`
+  section, **that replaces all your current saved queries and rules**
+  with the file's contents (obserae asks you to confirm first, and a
+  section left out of the file is kept untouched). Your past alerts are
+  kept — only the queries and rules are swapped. If the file has a
+  mistake, nothing is changed and you get a clear error.
+- **Validate file…** checks a file is correct without importing it.
 
 ---
 

@@ -39,9 +39,57 @@ Click **+ New output** and fill in the form.
 - **App token** — the Gotify application token.
 - **Priority** — leave at `0` to derive it from the alert severity, or pin
   a fixed `0–10`.
-- **Title / Message templates** — optional; sensible defaults otherwise.
+- **Title / Message templates** — optional. Leave empty for the defaults:
+  - title → `[HIGH] postgres-present` (`[<SEVERITY>] <rule name>`)
+  - message → `Alert "postgres-present" fired at 2026-06-04T12:00:00Z (7 matched).`
+
+  Or write your own with the same fields as the webhook body:
+  `{{.RuleName}}`, `{{.Severity}}`, `{{.FiredAt}}`, `{{.MatchedCount}}`,
+  `{{.Detail}}`, `{{.ID}}`. **The default message does not show the matched
+  rows** — to include them, add `{{.Detail}}` to your message template, e.g.
+  `{{.MatchedCount}} match(es): {{.Detail}}`.
 
 Then set the **routing** (below) and tick **Enabled**.
+
+---
+
+## What's in an alert
+
+Every output sends the **same alert content** (a webhook gets it as JSON,
+Gotify as a title + message). An alert carries:
+
+| Field | What it is |
+|-------|------------|
+| `rule_name` | the rule that fired |
+| `severity` | `info` / `low` / `medium` / `high` / `critical` |
+| `fired_at` | when it fired (UTC) |
+| `matched_count` | how many rows the rule's query returned |
+| `detail` | a **sample of the matched rows** — the rule's actual output |
+| `id` | a unique alert id (handy to ignore duplicates) |
+
+### The matched rows (`detail`)
+
+This is the part that tells you **what** tripped the rule, not just that it
+tripped. `detail` is the first **10 rows** the rule's query returned, as a
+list of value-lists in the order of the query's `KEEP`:
+
+```json
+[["10.0.0.50", 5432], ["10.0.0.51", 5432]]
+```
+
+A few things to know:
+
+- It's **capped at 10 rows** — `matched_count` tells you the real total.
+- The values have **no column names** (they're positional). If the columns
+  aren't obvious, put a hint in the rule name or your message template.
+- It's a snapshot taken **the moment the alert fired** — it always reflects
+  exactly what the rule saw.
+- A **heartbeat** rule fires when its query returns *nothing*, so its
+  `detail` is empty.
+
+To surface these rows in a notification, reference `{{.Detail}}` in your
+webhook body or Gotify message template (the Gotify default leaves them
+out).
 
 ---
 

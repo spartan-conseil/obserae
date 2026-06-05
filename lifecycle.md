@@ -7,12 +7,21 @@ footprint over time:
   backups take;
 - enable **retention** to evict stale flows and sessions after
   a configurable age;
-- enable **periodic full-database backups** as `.json.gz`
-  snapshots, with rotation by age and/or count;
-- run **manual export and import** of the flow data.
+- enable **periodic full-database backups**, with rotation by
+  age and/or count.
 
 Open it from the sidebar (`⧗ Lifecycle`) or directly at
-`/lifecycle`. Four tabs.
+`/lifecycle`. Three tabs: **Storage**, **Retention**, **Backup**.
+
+> The retention and backup settings you change here are now
+> **persisted** (in the `app_settings` table) and survive a daemon
+> restart — they no longer revert to `obserae.yaml` on reboot.
+
+> Looking for the old **Flow I/O** tab (manual flow JSON export /
+> import)? It was removed. Operator configuration — cartography,
+> flow matrix, alerting, outputs, enrichment, exporters, backup and
+> retention — is now exported and imported as one YAML file from the
+> [**Config I/O**](#) page (`⇄` in the sidebar, `/config-io`).
 
 ---
 
@@ -234,57 +243,6 @@ The same operations are also available from a future GUI panel
 (Phase 4); for now use the CLI. The internal documentation has the
 chain algorithm and design decisions (see
 [docs/lifecycle.md](../docs/lifecycle.md#restore-phase-3)).
-
----
-
-## Flow I/O tab
-
-Manual, on-demand export and import. Same backend as the periodic
-backup above; this tab is what you reach for during a one-off
-session.
-
-### Export
-
-Click **↓ Download flows.json**. The browser streams a complete
-JSON array of every flow currently in the database. Timestamps
-are emitted in absolute RFC3339 form
-(`2026-05-13T12:00:00Z`). Large datasets stream incrementally —
-the file shows up as growing in your downloads folder rather
-than waiting for the whole table to render.
-
-### Import
-
-Drop a file (or click to browse). Both **`.json`** and
-**`.json.gz`** are accepted; the daemon detects gzip
-automatically (by extension, by `Content-Encoding`, or by the
-file's magic bytes).
-
-The **Time mode** radio decides how timestamps are interpreted:
-
-- **Absolute** — keep timestamps as written in the file. Use
-  this when you want to preserve the original wall-clock of a
-  forensic capture.
-- **Relative** — shift every timestamp so the newest
-  `time_received` in the file lands at **now**. Use this to
-  replay a fixture captured days ago as if it were happening
-  right now — the sessionizer and matcher then pick it up via
-  their normal time-window selectors.
-
-Click **↑ Import**. The status banner below tells you how many
-flows were queued for the pipeline.
-
-> **Imports are asynchronous.** The records traverse the same
-> path as live NetFlow (enrichment → sessions → matching →
-> storage), so they appear on the other pages a few seconds
-> later, after the next buffer flush. Don't worry if the
-> Cockpit doesn't immediately reflect the import.
-
-> **Upload cap: 64 MiB after decompression.** The cap is
-> measured on the decompressed stream so a small gzip that
-> would balloon to gigabytes is rejected with a clear "payload
-> too large" message. For larger backups, drop the file into
-> the configured backup directory directly and use the daemon's
-> CLI to import it server-side.
 
 ---
 

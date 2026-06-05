@@ -180,6 +180,9 @@ retention:
   # default — the daemon never auto-evicts data unless you opt in.
   # See lifecycle.md for the full guide; the GUI's Lifecycle page can
   # also flip these knobs at runtime without restarting the daemon.
+  # Those GUI edits are PERSISTED (in the app_settings table) and
+  # survive a restart — at boot the daemon layers app_settings over
+  # the values below, so this YAML is only the initial default.
   enabled: false
   flows_max_age: 720h       # 30 days; 0 = do not purge flows
   sessions_max_age: 2160h   # 90 days; 0 = do not purge sessions
@@ -192,10 +195,10 @@ retention:
   batch_size: 50000
 
 backup:
-  # Periodic gzipped JSON snapshot of `flows`. Off by default. Files
-  # land under `directory` named flows-YYYYMMDDTHHMMSS.json.gz and
-  # are directly re-importable through the Lifecycle page's Flow I/O
-  # tab. Both rotation knobs (max_age, max_files) can apply together.
+  # Periodic native DuckDB snapshot of the whole database. Off by
+  # default. Files land under `directory`. Both rotation knobs
+  # (max_age, max_files) can apply together. As with retention, GUI
+  # edits to these knobs persist in app_settings across restarts.
   enabled: false
   directory: "./data/backups"
   interval: 24h             # cadence; runtime-immutable

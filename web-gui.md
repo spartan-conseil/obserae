@@ -28,6 +28,7 @@ looking at.
 │ ⇨ Outputs  │                                                         │
 │ ⇅ Sources  │                                                         │
 │ ⧗ Lifecycle│                                                         │
+│ ⇄ Config IO│                                                         │
 └────────────┴─────────────────────────────────────────────────────────┘
 ```
 
@@ -142,9 +143,10 @@ host or group from scratch.
 
 ### Bulk import / export
 
-The cartography you build in the GUI is the same YAML file you
-import from the CLI. To export the current state as YAML, head to
-**Data** (see below). To bulk-import, drop a YAML file there.
+The cartography you build in the GUI is part of the single YAML
+configuration file you export and import from the **Config I/O**
+page (see below) — its `cartography:` section. The Carto page's
+File menu keeps only **Export SVG** (a picture of the canvas).
 
 ---
 
@@ -276,8 +278,10 @@ What you can do:
   cost zero CPU per tick.
 - **Click a rule** to see its compiled expansions plus a chart of
   matches over the last 24h.
-- **Validate before import** — drop a `rules.yml` and the page
-  shows what would change before you commit.
+
+The flow-matrix rules are the `flow_matrix:` section of the single
+YAML config exported/imported from the **Config I/O** page (see
+below). The per-page YAML File menu was removed.
 
 A rule with a non-empty `LAST_ERROR` is *quarantined*: it lives
 in the database but the matcher skips it. Typical cause: a
@@ -398,11 +402,57 @@ The full enrichment mechanism is described in
 
 ---
 
+## Config I/O
+
+`⇄ Config I/O` (`/config-io`) is the **one place** to export and
+import your whole operator configuration as a single YAML file —
+it replaces the per-page YAML File menus that used to live on
+Carto, Flow Matrix, Rules and Flow Simulation.
+
+The file has one top-level key per domain, each in the format that
+domain already used:
+
+```yaml
+cartography: { networks: [...], hosts: [...], groups: [...] }
+flow_matrix: { rules: [...] }
+alerting:    { queries: [...], rules: [...] }
+simulation:  { enabled: true, sources: [...] }
+outputs:     [ ... ]
+enrichment:  { enabled: true, sources: [...] }
+exporters:   [ ... ]
+backup:      { ... }
+retention:   { ... }
+```
+
+Three actions:
+
+- **Export configuration** — downloads `obserae-config.yaml`.
+  Empty domains are omitted. The file contains secrets in clear
+  text (output tokens / HMAC keys) — treat it as sensitive.
+- **Validate file…** — checks a file without writing anything
+  (the same checks the import runs).
+- **Import file…** — after a confirmation, applies it. A section
+  **present** in the file *replaces* that domain; a section
+  **absent** is left untouched. The whole file is validated first,
+  so a mistake never half-applies. A summary then lists which
+  domains were applied, which were skipped, and any warnings
+  (e.g. an exporter IP the daemon has never observed, which can
+  only be labelled once it has sent traffic).
+
+Cartography is always applied before the flow matrix and the
+alerting rules, since those reference topology by name.
+
+---
+
 ## Lifecycle
 
-Everything that *manages data over time*: retention, backup,
-storage footprint, and the manual import / export controls. Four
-tabs. See [lifecycle.md](lifecycle.md) for the full walkthrough.
+Everything that *manages data over time*: retention, backup and
+storage footprint. Three tabs (Storage / Retention / Backup). See
+[lifecycle.md](lifecycle.md) for the full walkthrough.
+
+> Retention and backup changes made here persist across restarts
+> (stored in `app_settings`), so they no longer revert to
+> `obserae.yaml` on reboot.
 
 ### Storage tab
 
@@ -421,23 +471,11 @@ restart needed.
 
 ### Backup tab
 
-Periodic gzipped JSON dump of the `flows` table. Files are named
-`flows-YYYYMMDDTHHMMSS.json.gz` and land under the configured
-directory. Rotation enforces the two limits you set (max age and/or
-max files). A **Backup now** button writes one snapshot
-immediately; the file listing below refreshes as soon as it lands.
-
-The exact format is identical to what the import below accepts —
-so a backup file round-trips cleanly into a fresh daemon for
-forensic replay.
-
-### Flow I/O tab
-
-Manual export and import of the `flows` table as a hand-editable
-JSON array. The import accepts both `.json` and `.json.gz` (gzip
-detection is automatic). The **time mode** radio controls whether
-timestamps are kept absolute or shifted so the newest record lands
-at "now" — useful for replaying a fixture captured days ago.
+Periodic native DuckDB snapshots of the whole database, landing
+under the configured directory. Rotation enforces the two limits
+you set (max age and/or max files). A **Backup now** button writes
+one snapshot immediately; the file listing below refreshes as soon
+as it lands, and a snapshot can be restored from here.
 
 ---
 

@@ -126,10 +126,13 @@ atomic. Use `cartography validate FILE` to dry-run the checks.
 
 ### Bulk (YAML)
 
+The topology is the `cartography:` section of the single consolidated
+config bundle (CLI `obserae-cli config …`, or the GUI's Config I/O page):
+
 ```sh
-obserae-cli cartography validate topology.yml      # checks only
-obserae-cli cartography import   topology.yml      # atomic replacement
-obserae-cli cartography export   --output a.yml    # pull current state
+obserae-cli config validate config.yml      # checks only
+obserae-cli config import   config.yml      # apply (cartography section replaces the topology)
+obserae-cli config export   --output a.yml  # pull the whole config, cartography included
 ```
 
 ### Per-entity (CLI)

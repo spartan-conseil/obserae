@@ -82,11 +82,21 @@ groups:
     members: ["webserver", "database"]
 ```
 
-Import it:
+Import it. The CLI (and the GUI's Config I/O page) work on **one
+consolidated bundle**, so put the block above under a top-level
+`cartography:` key in a `config.yml` and import that:
+
+```yaml
+# config.yml
+cartography:
+  networks: [...]
+  hosts: [...]
+  groups: [...]
+```
 
 ```sh
-obserae-cli cartography import cartography.yml
-obserae-cli cartography export                # round-trip to verify
+obserae-cli config import config.yml
+obserae-cli config export                # round-trip to verify
 ```
 
 The full cartography reference is in [cartography.md](cartography.md).
@@ -131,10 +141,20 @@ rules:
 > protocol; otherwise pin it explicitly with `*/TCP` or `53/UDP`.
 > See [rules.md](rules.md#the-portservice-field).
 
-Import:
+Import: add these rules under a top-level `flow_matrix:` key in the same
+`config.yml` (alongside `cartography:`) and re-import the bundle:
+
+```yaml
+# config.yml
+cartography: { ... }
+flow_matrix:
+  rules:
+    - name: webserver-to-database
+      ...
+```
 
 ```sh
-obserae-cli rules import rules.yml
+obserae-cli config import config.yml
 obserae-cli rule ls
 ```
 

@@ -180,14 +180,18 @@ means the rule is **quarantined** (see below).
 
 ### Bulk YAML
 
+Rules are the `flow_matrix:` section of the single consolidated config
+bundle (CLI `obserae-cli config …`, or the GUI's Config I/O page):
+
 ```sh
-obserae-cli rules validate rules.yml
-obserae-cli rules import   rules.yml
-obserae-cli rules export   --output rules.yml
+obserae-cli config validate config.yml
+obserae-cli config import   config.yml
+obserae-cli config export   --output config.yml
 ```
 
-`rules import` is a **full atomic replacement** — every rule not in
-the YAML is removed. Use per-entity commands for incremental edits.
+When the bundle carries a `flow_matrix:` section it is a **full atomic
+replacement** of the rule set — every rule not in it is removed. Use the
+per-entity commands for incremental edits.
 
 ### Per-entity
 

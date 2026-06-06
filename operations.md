@@ -255,15 +255,16 @@ Two things to back up:
    the daemon is idle is safe. For maximum safety, stop the daemon,
    copy, restart.
 
-2. **Your authored content** — the cartography and the rules:
+2. **Your authored content** — the whole configuration in one bundle:
 
    ```sh
-   obserae-cli cartography export > /var/backups/obserae/$(date +%F).carto.yml
-   obserae-cli rules export       > /var/backups/obserae/$(date +%F).rules.yml
+   obserae-cli config export > /var/backups/obserae/$(date +%F).config.yml
    ```
 
-   These two YAMLs are enough to rebuild the topology and the rule
-   set on a fresh daemon. The `flows` history itself is only in the
+   This single YAML (cartography, flow matrix, alerting, outputs,
+   enrichment, exporters, backup, retention, simulation) is enough to
+   rebuild the operator state on a fresh daemon. The `flows` history
+   itself is only in the
    DuckDB file.
 
 A daily cron job that exports both YAMLs is the operator's safety

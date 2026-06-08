@@ -364,6 +364,26 @@ Bounds accept Unix epoch, -N (seconds ago), ISO strings, `now`, or `?` for a bin
 
 `SORT` defaults to ASC. `LIMIT` without `SORT` returns an arbitrary slice — pair them.
 
+### DROP col1, col2, …
+
+**Intent.** Remove columns and keep all the others, in their original order. The reciprocal of KEEP.
+
+```nfql
+FROM flows | DROP tcp_flags, flow_version
+```
+
+Use when it is shorter to list what to discard than what to keep. Preserves row count; rejects dropping every column.
+
+### RENAME new = old, …
+
+**Intent.** Rename columns in place — new name on the left of `=`, like STATS and EVAL.
+
+```nfql
+FROM flows | RENAME client = src_addr, server = dst_addr
+```
+
+Keeps every other column and the original order. Preserves row count; the new name must not collide with a surviving column.
+
 ### STATS <alias> = <fn>(<col>) BY <col>, …
 
 **Intent.** Aggregate. Produces a NEW schema = the BY columns + the aggregate aliases; original columns are dropped.

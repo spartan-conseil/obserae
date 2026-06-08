@@ -306,11 +306,14 @@ conversation actually happened — not record reception time, because two
 exporters flush the same conversation's NetFlow record tens of seconds
 apart.
 
-The `sessions_consolidated` table exposes one row per conversation:
-`min`/`max` volumes across exporters (never summed, so no
-double-counting) and a `coherence_pct` (how much the exporters agree on
-the packet total). `sampler_count > 1` isolates the genuine multi-source
-consolidations. Toggle and tune via the `correlation` config block.
+The `sessions_consolidated` table exposes one row per conversation,
+**client/server oriented**: `client_ip`/`client_port`,
+`server_ip`/`server_port`, and `min`/`max` directional volumes
+(`client_to_server_*` for the request, `server_to_client_*` for the
+response) across exporters (never summed, so no double-counting) plus a
+`coherence_pct` (how much the exporters agree on the packet total).
+`sampler_count > 1` isolates the genuine multi-source consolidations.
+Toggle and tune via the `correlation` config block.
 
 Correlation only matches a freshly-closed session against peers closed
 **recently** — within `correlation.horizon` (default 16m), the window

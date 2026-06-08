@@ -13,7 +13,7 @@ We assume you have already installed obserae following
 ## 1. Start the daemon
 
 ```sh
-mkdir -p data/parquet
+mkdir -p data
 ./obserae --config obserae.yaml &
 ```
 

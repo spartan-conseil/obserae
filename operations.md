@@ -228,7 +228,7 @@ Useful checks to script:
 |-----------------------------------------------------------------------|------------------------------------------------------------------------------------|
 | `flow_count` not increasing                                           | Exporter not sending, port firewalled, or pipeline stuck                          |
 | `flow_count: 0` with `packets_awaiting_template > 0`                  | NetFlow v9 cold-start blackout: packets arrive but no template is known. Known templates persist across restarts, so this means a brand-new exporter — wait for its next refresh or force it with `configctl netflow stop && configctl netflow start` on OPNsense. |
-| `buffer.directory` growing while retention is on                      | Flows are the parquet store — confirm retention is dropping old day partitions (Lifecycle tab), or the disk is full |
+| The flows store (`<data_dir>/flows`) growing while retention is on    | Flows are the parquet store — confirm retention is dropping old day partitions (Lifecycle tab), or the disk is full |
 | Any rule with non-empty `last_compile_error`                          | Cartography mutation broke a rule reference                                       |
 | Steady growth in matches for an alert rule                            | Detection actually firing                                                         |
 | `sessions open (live)` near its cap, or `sessions evicted` climbing   | The in-memory session map is under pressure — oldest sessions are being force-closed (`capacity`). A scan/flood, or `sessions.max_open_ksessions` is too small. |
@@ -361,6 +361,77 @@ If that stays at 0 while flows ingest, the most common historical
 cause was a non-UTC database session — fixed in the daemon since
 v1.0. If you ingested data before the fix, wipe the DuckDB file and
 re-ingest.
+
+### Memory usage keeps climbing
+
+obserae is designed to run for months without restarting. If you watch
+RAM creep up day after day (for example on a small box like a Raspberry
+Pi), the cause is **almost always DuckDB**, the embedded database — not
+a bug in obserae itself. Two settings fix it:
+
+**1. Cap DuckDB's memory.** Left unset, DuckDB will happily use up to
+**80 % of your machine's RAM** for caching. On a small box that means it
+keeps growing until it's using most of the memory. Cap it:
+
+```yaml
+storage:
+  memory_limit_mb: 512   # hard ceiling for DuckDB's cache (MB)
+  max_threads: 2         # fewer workers = smaller, steadier memory
+```
+
+**2. Turn on retention.** By default obserae keeps every flow and
+session forever, so the database grows without end — and DuckDB's memory
+grows with it. Enabling retention makes the data plateau, so memory does
+too:
+
+```yaml
+retention:
+  enabled: true
+  flows_max_age: 168h      # keep 7 days of raw flows
+  sessions_max_age: 720h   # keep 30 days of sessions
+```
+
+Use both on a small host. To confirm it's DuckDB and not obserae, the
+daemon prints a memory line on a timer (every 5 minutes by default):
+
+```
+runtime memstats goroutines=64 heap_inuse=52428800 heap_sys=67108864 sys=92274688 ...
+```
+
+Compare two of these a few hours apart:
+
+- **`heap_inuse` rising steadily** → a genuine leak. Turn on the
+  profiler to find it (see below).
+- **`goroutines` rising steadily** → leaked background tasks.
+- **`heap_inuse` steady but `sys` rising** → *not* a leak; this is Go
+  holding on to freed memory. It plateaus on its own, or you can cap it
+  with the `GOMEMLIMIT` environment variable on the service.
+- **`heap_inuse` flat but the *process* RSS keeps climbing** → it's
+  DuckDB, not Go (the two settings above are your fix). Check with
+  `grep VmRSS /proc/$(pgrep -f bin/obserae)/status` — if RSS dwarfs
+  `heap_sys`, the memory lives in DuckDB.
+
+To pinpoint a real leak, switch the profiler on (keep it on localhost —
+it has no authentication):
+
+```yaml
+debug:
+  pprof_enabled: true
+  pprof_address: "127.0.0.1:6060"
+```
+
+Restart, then grab two heap snapshots a few hours apart and let the Go
+tooling tell you what grew:
+
+```sh
+curl -s http://127.0.0.1:6060/debug/pprof/heap > heap_a.pb.gz
+# … several hours later …
+curl -s http://127.0.0.1:6060/debug/pprof/heap > heap_b.pb.gz
+go tool pprof -base heap_a.pb.gz heap_b.pb.gz
+```
+
+Set `debug.memstats_interval: 0` if you'd rather not have the periodic
+log line at all.
 
 ---
 

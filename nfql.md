@@ -64,6 +64,8 @@ Stages run **left-to-right**, like Unix pipes. A `WHERE` after a
 | `FROM`        | Source table.                                                      |
 | `WHERE`       | Filter rows by a boolean predicate.                                |
 | `KEEP`        | Project to the listed columns, in the listed order.                |
+| `DROP`        | Remove the listed columns, keep the rest in their original order (reciprocal of `KEEP`). |
+| `RENAME`      | Rename columns in place: `RENAME new = old, …` (new name on the left). |
 | `SORT`        | Order rows by one or more keys (`ASC` default, `DESC` available).  |
 | `LIMIT`       | Cap the number of rows.                                            |
 | `LAST`        | Time window: rows from the last N seconds.                         |
@@ -108,11 +110,13 @@ syntax stays the same regardless of which table you query.
 `ab_bytes`/`ba_bytes`, `ab_pkts`/`ba_pkts`, `correlation_id`
 (conversation group; NULL while open).
 
-**`sessions_consolidated`**: `correlation_id`, `ip_a`/`port_a`,
-`ip_b`/`port_b`, `protocol`, `session_count`, `sampler_count`,
-`samplers`, `coherence_pct` (0–100), `min_ab_bytes`/`max_ab_bytes`
-(and `_pkts`, and the `ba_` pair), `opened_at`, `closed_at`,
-`server_ip`/`server_port`.
+**`sessions_consolidated`**: `correlation_id`, `client_ip`/`client_port`,
+`server_ip`/`server_port`, `protocol`, `session_count`, `sampler_count`,
+`samplers`, `coherence_pct` (0–100),
+`min_client_to_server_bytes`/`max_client_to_server_bytes` (and `_packets`,
+and the `server_to_client_` pair), `opened_at`, `closed_at`. Endpoints are
+client/server oriented (not the raw sessions' canonical `a`/`b`); the
+virtual `ip`/`port` cover both sides.
 
 **`session_matches`**: `session_id`, `rule_id`, `matched_at`.
 
@@ -386,6 +390,12 @@ up the matching rows in another.
 | `PIVOT NOT`   | current columns only      | "rows of B that match *no* row of A"              |
 | `JOIN`        | current columns + `prev_*` | "rows of B paired with their A row, both visible" |
 
+Either side of the predicate can be a **virtual column** (`ip`, `port`):
+it matches *any* of its real columns. So `… > FROM flows | JOIN ip == ip`
+pairs a flow whose **source or destination** equals the other pipeline's
+`ip` — handy to find every flow touching a threat IP regardless of
+direction.
+
 ### Examples
 
 **Top 10 sessions by volume → which rules they matched**
@@ -531,7 +541,7 @@ FROM sessions
 ```nfql
 FROM sessions_consolidated
   | WHERE sampler_count > 1
-  | KEEP ip_a, ip_b, samplers, min_ab_bytes, max_ab_bytes, coherence_pct
+  | KEEP client_ip, server_ip, samplers, min_client_to_server_bytes, max_client_to_server_bytes, coherence_pct
   | SORT coherence_pct ASC
 ```
 

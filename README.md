@@ -60,7 +60,7 @@ tar xzf obserae.tar.gz
 cd obserae_linux_*
 
 # Run with the bundled minimal config
-mkdir -p data/parquet
+mkdir -p data
 ./obserae --config obserae.yaml
 ```
 
@@ -82,10 +82,8 @@ listen:
   address: "0.0.0.0:2055"     # NetFlow ingest port
 
 storage:
+  data_dir: "./data"
   duckdb_path: "./data/obserae.duckdb"
-
-buffer:
-  directory: "./data/parquet"
 
 control:
   socket: "./data/obserae.sock"

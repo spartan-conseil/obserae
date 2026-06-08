@@ -18,10 +18,12 @@ listen:
   address: "0.0.0.0:2055"
 
 storage:
+  data_dir: "./data"
   duckdb_path: "./data/obserae.duckdb"
 
 buffer:
-  directory: "./data/parquet"
+  max_records: 10000
+  max_age: 5s
 
 control:
   socket: "./data/obserae.sock"
@@ -52,17 +54,23 @@ buffer:
   max_records: 10000          # records accumulated in memory
   max_age: 5s                 # time since the first record of the batch
 
-  # Where short-lived parquet files queue up before insertion.
-  # They are deleted immediately after a successful INSERT.
-  directory: "./data/parquet"
-
 storage:
+  # Root directory for on-disk table data. Each parquet-backed table gets its
+  # own directory under this root, named after the table (<data_dir>/flows,
+  # <data_dir>/ip_enrichment, …). Only this root is configurable.
+  data_dir: "./data"
   # Path to the DuckDB database file (created on first run).
   duckdb_path: "./data/obserae.duckdb"
 
   # Size of the read-only connection pool used by the web GUI and
   # the NFQL query handler. Increase if heavy queries slow the GUI.
   reader_conns: 4
+
+  # Cap DuckDB's memory (MB). 0 = its default of ≈80% of RAM. The key
+  # knob for bounding memory on a small host — see operations.md
+  # "Memory usage keeps climbing". Pair with retention.
+  memory_limit_mb: 0
+  max_threads: 0      # DuckDB worker threads; 0 = one per core
 
 control:
   # Unix socket for obserae-cli. /var/run/obserae.sock needs root or
@@ -211,6 +219,14 @@ logging:
   # 2 = DEBUG + file:line in every record
   # 3 = TRACE  (per-packet, very chatty — diagnostics only)
   verbosity: 0
+
+debug:
+  # Long-run memory diagnostics. See operations.md → "Memory usage
+  # keeps climbing". pprof is OFF by default (unauthenticated, keep it
+  # on localhost); the memstats log line is ON every 5 minutes.
+  pprof_enabled: false
+  pprof_address: "127.0.0.1:6060"
+  memstats_interval: 5m         # 0 disables the periodic memory log
 ```
 
 ---
@@ -226,7 +242,7 @@ corresponding YAML key.
 | `--listen ADDR`            | host:port    | `listen.address`       | `0.0.0.0:2055`           |
 | `--buffer-max-records N`   | int (>0)     | `buffer.max_records`   | 10000                    |
 | `--buffer-max-age D`       | Go duration  | `buffer.max_age`       | `5s`                     |
-| `--buffer-dir DIR`         | path         | `buffer.directory`     | `./data/parquet`         |
+| `--data-dir DIR`           | path         | `storage.data_dir`     | `./data`                 |
 | `--duckdb PATH`            | path         | `storage.duckdb_path`  | `./data/obserae.duckdb`  |
 | `--control-socket PATH`    | path         | `control.socket`       | `/var/run/obserae.sock`  |
 | `--workers N`              | int          | `decoder.workers`      | 0                        |
@@ -242,8 +258,9 @@ The daemon refuses to start if any of these fails:
 
 - `listen.address` is empty.
 - `buffer.max_records` or `buffer.max_age` ≤ 0.
-- `buffer.directory` is empty.
+- `storage.data_dir` is empty.
 - `storage.duckdb_path` is empty.
+- `storage.memory_limit_mb` or `storage.max_threads` < 0.
 - `control.socket` is empty.
 - `matcher.interval` ≤ 0.
 - `sessions.interval`, `sessions.grace`, `sessions.hard_timeout` ≤ 0.
@@ -252,6 +269,8 @@ The daemon refuses to start if any of these fails:
 - `correlation.window` < 0 or `correlation.horizon` < 0 (when `correlation.enabled`).
 - `enrichment.cache_size` ≤ 0.
 - `logging.verbosity` < 0.
+- `debug.pprof_address` is empty while `debug.pprof_enabled` is true.
+- `debug.memstats_interval` < 0.
 
 Better to fail loud at startup than to ingest data with a
 half-configured pipeline.

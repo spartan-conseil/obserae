@@ -435,9 +435,10 @@ Three actions:
   **present** in the file *replaces* that domain; a section
   **absent** is left untouched. The whole file is validated first,
   so a mistake never half-applies. A summary then lists which
-  domains were applied, which were skipped, and any warnings
-  (e.g. an exporter IP the daemon has never observed, which can
-  only be labelled once it has sent traffic).
+  domains were applied, which were skipped, and any warnings.
+  Exporters are created even if the daemon has never observed
+  traffic from them — re-importing a full config usually targets a
+  blank database, so unseen exporters are kept rather than dropped.
 
 Cartography is always applied before the flow matrix and the
 alerting rules, since those reference topology by name.

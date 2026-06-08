@@ -139,7 +139,7 @@ Extract and run:
 tar xzf obserae.tar.gz
 cd obserae_linux_*
 
-mkdir -p data/parquet
+mkdir -p data
 ./obserae --config obserae.yaml
 ```
 

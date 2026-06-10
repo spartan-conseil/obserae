@@ -21,6 +21,11 @@ Wait until you see `INFO collector listening` and `INFO web server
 listening`. The daemon is now accepting NetFlow on UDP 2055 and
 serving the GUI at <http://localhost:8080>.
 
+> **First sign-in.** The GUI requires a login. On this first start the
+> daemon prints a generated `admin` password **once** in its log — a
+> `WARN generated admin password (first boot)` line. Copy it; you'll use
+> it to sign in. Lost it? Run `obserae-cli user reset-admin-password`.
+
 Check it is healthy:
 
 ```sh

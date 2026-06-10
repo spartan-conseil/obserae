@@ -61,6 +61,7 @@ so a typo never fails silently.
 | `output`        | Manage alert delivery targets (webhook/Gotify): CRUD, test, deliveries |
 | `exporter`      | Label discovered NetFlow exporters and trigger a rescan          |
 | `enrichment`    | IP enrichment: master toggle, per-source feeds, manual refresh   |
+| `user`          | Manage GUI users, groups, API tokens; reset the admin password   |
 | `query`         | Run an NFQL pipeline against the daemon                         |
 | `ps`            | Live database activity (in-flight ops + writer queue)           |
 | `retention`     | Show the data-retention policy + last sweep, or run one now      |
@@ -555,6 +556,46 @@ obserae-cli backup restore --point-in-time 2026-05-28T13:00:00Z --confirm
 Backup scheduling and retention are configured on the
 [Lifecycle page](lifecycle.md); the full restore workflow and its
 exit-after-swap rationale are documented there too.
+
+---
+
+## User & access management
+
+The `user` group administers GUI accounts, groups, API tokens and the admin
+password — the same model as the GUI [Users page](web-gui.md#users--access),
+usable headless (e.g. to recover access).
+
+```sh
+# Recover access: generate a fresh admin password (printed once).
+obserae-cli user reset-admin-password
+# Or set a chosen one (also accepts the password on stdin).
+obserae-cli user set-admin-password --password 's3cret'
+
+# Users.
+obserae-cli user ls
+obserae-cli user add --username alice --password 's3cret' --display "Alice" --groups analyst
+obserae-cli user rm alice
+
+# Groups (built-in admin/analyst/auditor cannot be changed).
+obserae-cli user group-ls
+obserae-cli user group-add --name soc --perms cartography:read,sessions:read,alerts:read,alerts:ack
+obserae-cli user group-rm soc          # only if it has no members
+
+# API tokens (the secret is printed once; use it as a Bearer credential).
+obserae-cli user token-add --name ci --user alice
+obserae-cli user token-ls
+obserae-cli user token-rm <TOKEN_ID>   # revoke
+```
+
+A token authenticates REST calls against the web API:
+
+```sh
+curl -H "Authorization: Bearer obs_…" http://127.0.0.1:8080/api/query …
+```
+
+The full permission catalogue (`cartography:read`, `rules:write`,
+`nfql:execute`, `users:manage`, …) is described on the
+[Users page](web-gui.md#users--access).
 
 ---
 

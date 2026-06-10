@@ -159,8 +159,9 @@ commercial NDR.
 
 **obserae is not** a packet capture tool, an SIEM, or a SOAR. It works
 exclusively on NetFlow records (v5 and v9) — it never sees raw
-packets. There is no log ingestion, no alerting integration (yet),
-and no commercial threat-intel.
+packets. There is no log ingestion and no commercial threat-intel —
+detection runs on NFQL alert rules, and alerts are delivered through
+webhook and Gotify [outputs](outputs.md).
 
 ---
 

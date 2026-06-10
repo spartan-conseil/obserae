@@ -60,6 +60,8 @@ size; then one card per store:
 - **Sessions archive** / **Consolidated archive** — the cold tiers of the
   session and consolidated-conversation tables.
 - **Enrichment ranges** — the cloud/threat-intel CIDR catalogue (per source).
+- **Audit log** — the append-only audit journal (JSONL, hour-partitioned);
+  its size, file count, span and write timeline, same as the parquet stores.
 
 Each time-partitioned card shows:
 
@@ -115,17 +117,20 @@ the automatic cadence keeps its own clock.
   correlation overlay row and ages out the dead-letter audit trail, so no
   orphan rows are left behind.
 
-### The two ages
+### The ages
 
 | Field                  | What it means                                        |
 |------------------------|------------------------------------------------------|
 | **Flows max age**      | Drop rows from `flows` whose `time_received` is older than this. Default `720h` (30 days). |
 | **Sessions max age**   | Drop rows from `sessions` whose `last_activity_at` is older than this. Default `2160h` (90 days). |
+| **Audit log max age**  | Drop audit-journal entries older than this. Default `0` — **the audit log is kept forever** unless you set a limit. Raise this deliberately: the audit trail is your forensic record. |
 
-Both accept Go duration strings: `48h`, `7d` is **not** supported,
-write `168h` instead. Set a value to `0` to skip that table
-entirely (e.g. `0` on sessions = "keep sessions forever, only
-purge flows").
+All three are edited from the **Retention** tab as a number + unit
+(hours / days / weeks / months) and accept Go duration strings under
+the hood (`168h`, not `7d`). Set a value to `0` to skip that store
+entirely (e.g. `0` on the audit log = "keep the audit trail forever").
+The status line reports what the last sweep removed — flows, sessions
+and audit file(s).
 
 Edits take effect on the **next** sweep. You don't have to
 restart the daemon — but they also don't get persisted back to
@@ -152,14 +157,27 @@ that happens.
 
 ## Backup tab
 
-Periodic **transactional snapshots of the whole obserae database**
-— flows, sessions, rules, cartography, enrichment, exporters and
-NetFlow templates — all dumped together so a restore reconstructs
+Periodic **transactional snapshots of the whole obserae state** —
+both the DuckDB database (rules, cartography, exporters, NetFlow
+templates, hot sessions…) **and** the on-disk stores (flows,
+session & consolidated archives, IP enrichment, enrichment ranges,
+and the audit log) — all captured together so a restore reconstructs
 exactly the state the daemon was in.
 
 Each snapshot is a directory `obserae-backup-YYYYMMDDTHHMMSS/`
-containing one `<table>.json.gz` per table plus a `manifest.json`
-listing what's inside.
+containing:
+
+- `snapshot.duckdb` — a native binary copy of the database.
+- `manifest.json` — metadata (format, kind, row counts, per-store
+  file counts, watermarks).
+- `stores/<key>/…` — a mirror of the on-disk parquet/JSONL stores.
+  A **full** snapshot copies the whole tree; a **delta** only the
+  partition directories changed since its parent.
+
+On restore the database is swapped and the stores are reapplied:
+the data stores are **replaced** (point-in-time consistent with the
+database), while the audit log is **merged** so its append-only
+history is never erased.
 
 ### The master toggle
 

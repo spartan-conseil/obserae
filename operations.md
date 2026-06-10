@@ -190,6 +190,32 @@ alias obserae-cli='/usr/local/bin/obserae-cli --socket /var/lib/obserae/run/obse
 
 ---
 
+## Audit log
+
+The **Audit log** page (sidebar → *Audit log*) is the tamper-evident record of
+*who did what, when*. Every sensitive action — cartography/rules/users/lifecycle
+changes, logins and logouts, denied requests — is written to an append-only
+journal you can search but not edit from the GUI.
+
+- **Time window + histogram** — pick a window (1h / 24h / 7d / 30d). The bar
+  chart shows event volume over time, coloured by result (green success, red
+  failure, amber denied, …) so a spike of failures or denials stands out at a
+  glance.
+- **Filter** — narrow by user, action, or result, or free-text search across the
+  action / target / user. Click a row to see the full detail, including the
+  **before/after** of what changed (secrets such as tokens and passwords are
+  redacted automatically).
+- **Pagination** — the list is paged so a large journal never overloads the
+  browser.
+- **Export** — *Export JSONL* / *Export CSV* download the current filter for
+  incident response, ticketing, or a SIEM.
+
+Access is gated by the `auditlog:read` permission (held by the built-in
+**admin** and **auditor** groups). The journal's own retention is set on the
+[Lifecycle](lifecycle.md) page (*Audit log max age*) — it is kept **forever** by
+default. Entries land on disk under `<data_dir>/auditlog/`; CLI actions are
+attributed to the virtual `cli` user.
+
 ## Monitoring
 
 `obserae-cli status --json` is the canonical health datapoint. Plug

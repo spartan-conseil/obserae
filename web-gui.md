@@ -4,9 +4,13 @@ obserae ships with a web interface bound to `http://localhost:8080`
 by default. This page tours every screen so you know what you're
 looking at.
 
-> **Security reminder.** The GUI has no built-in authentication. The
-> default `127.0.0.1:8080` bind keeps it on the loopback. To expose
-> it on the network, put a reverse proxy with TLS and auth in front
+> **Sign in required.** The GUI asks every visitor to log in. On the
+> very first start obserae creates an `admin` account and prints its
+> generated password **once** in the daemon log — look for a `WARN`
+> line `generated admin password (first boot)`. Sign in with it, then
+> change it (topbar user menu, or `obserae-cli user reset-admin-password`).
+> The default `127.0.0.1:8080` bind still keeps the GUI on the loopback;
+> add a reverse proxy with TLS to expose it on the network
 > (see [configuration.md](configuration.md#expose-the-web-gui-on-the-network)).
 
 ---
@@ -29,6 +33,7 @@ looking at.
 │ ⇅ Sources  │                                                         │
 │ ⧗ Lifecycle│                                                         │
 │ ⇄ Config IO│                                                         │
+│ ◉ Users    │                                                         │
 └────────────┴─────────────────────────────────────────────────────────┘
 ```
 
@@ -420,9 +425,17 @@ simulation:  { enabled: true, sources: [...] }
 outputs:     [ ... ]
 enrichment:  { enabled: true, sources: [...] }
 exporters:   [ ... ]
+users:       { groups: [...], users: [...], api_tokens: [...] }
 backup:      { ... }
 retention:   { ... }
 ```
+
+The `users` section carries accounts, **custom** groups and API tokens (with
+password/token hashes, never plaintext — treat the file as sensitive). The three
+**built-in groups** (`admin`, `analyst`, `auditor`) are **never exported**: they
+are always present and the server manages their permissions. If a hand-edited
+bundle still defines one, the import **ignores it** and shows a warning — so a
+file cannot redefine a privileged built-in role.
 
 Three actions:
 
@@ -505,6 +518,45 @@ FROM flows | WHERE sampler_address == "127.0.0.1"
 ```
 
 Stop the simulator and the live traffic resumes as before.
+
+---
+
+## Users & Access
+
+The **Users** page (visible only to administrators) manages who can sign in
+and what they can do. It has three tabs, each laid out like the Flow Matrix: a
+list of rows with **Edit** and **Delete** buttons, and a **+ New …** button at
+the top right that opens a creation dialog. Edits and deletions open a dialog
+too (deletes ask for confirmation first).
+
+- **Users** — each row shows the account, its groups and its status. **+ New
+  user** creates an account (username, display name, password, groups);
+  **Edit** changes the display name, groups, enabled/disabled state, and can set
+  a new password (leave the password blank to keep the current one). The
+  built-in `admin` account is always present and cannot be deleted.
+- **Groups** — a user's permissions are the union of their groups'. Three
+  built-in groups ship and cannot be edited or deleted:
+  - **admin** — full access to everything.
+  - **analyst** — operate the product: view, investigate, run NFQL,
+    acknowledge alerts, edit cartography, rules and detection.
+  - **auditor** — read-only: dashboard, cartography, sessions, rules, alerts.
+
+  Use **+ New group** to create a **custom group** and tick exactly the
+  permissions it grants (e.g. `cartography:read`, `nfql:execute`,
+  `outputs:manage`); **Edit** adjusts its description and permissions. A custom
+  group can only be deleted once it has no members.
+- **API tokens** — **+ New token** mints a token for a user to call the REST
+  API from a script: `Authorization: Bearer obs_…`. The secret is shown **once**
+  in a dialog right after creation — copy it then. Tokens inherit their owner's
+  permissions and can be revoked or deleted from their row.
+
+Pages and actions a user isn't allowed to use are hidden from their sidebar and
+toolbars, and the server refuses them regardless (so a hidden action can't be
+forced by hand). Sign out from the **user menu** at the top-right of any page.
+
+The same operations are available headless via the CLI — see
+[cli.md](cli.md#user--access-management) — including recovering access with
+`obserae-cli user reset-admin-password` if you are locked out of the GUI.
 
 ---
 

@@ -178,9 +178,10 @@ columns expand to `ip_a OR ip_b` / `port_a OR port_b`. Cartography
 references work as on `flows`.
 
 ```nfql
-# Currently active sessions to the database tier
+# Recent sessions to the database tier (closed-only table — scope with LAST)
 FROM sessions
-  | WHERE state == "active" AND ip == "databases" AND port == 5432
+  | LAST 3600
+  | WHERE ip == "databases" AND port == 5432
   | KEEP ip_a, ip_b, ab_pkts, ba_pkts, opened_at
   | SORT opened_at DESC
 
@@ -198,11 +199,6 @@ FROM sessions
   | KEEP ip_a, ip_b, port_b, opened_at
   | SORT opened_at DESC
 
-# Late-arrival audit
-FROM sessions_dead_letter
-  | LAST 3600
-  | WHERE reason == "late_arrival"
-  | KEEP ip_a, ip_b, port_b, flow_end, dropped_at, related_session_id
 ```
 
 ---
@@ -218,7 +214,6 @@ sessions:
   grace: 30s                # hold back recent flows (correctness vs latency)
   hard_timeout: 15m         # visibility threshold for long-running sessions
   max_open_ksessions: 500   # cap on concurrent open sessions (×1000)
-  recovery_window: 10m      # how far back to replay flows after a restart
   idle:
     tcp_established: 60s
     tcp_half_open: 5s       # short on purpose: scans surface fast
@@ -233,7 +228,6 @@ sessions:
 | `grace`           | Smaller → lower visibility delay, more late-arrival rejections.                                 |
 | `hard_timeout`    | Smaller → long sessions surface earlier; more in-flight rows visible.                           |
 | `max_open_ksessions` | The ceiling on how many sessions can be open at once before the oldest get force-closed. Raise it if you legitimately have many concurrent conversations; a flood of `capacity` closures means it is too low (or you are being scanned). |
-| `recovery_window` | After a restart, how far back the engine replays flows to rebuild its in-memory state. |
 | `idle.tcp_*`      | Tune to match your environment's keepalive cadence. Most stacks: 60–90 s keepalives.            |
 | `idle.tcp_half_open` | Lower bound is what you can reliably detect — 2 s aggressive, 5 s safe.                       |
 
@@ -248,12 +242,9 @@ traffic happened. The engine guards against two failure modes:
   is younger than `now - grace` is held back in an ordered
   in-memory buffer and folded only once it matures. This gives a
   flow's late siblings time to arrive first.
-- **Truly late arrivals** — a flow whose `time_flow_end` pre-dates
-  the `closed_at` of an existing closed session with the same
-  canonical key is rejected. Closed sessions are immutable, so the
-  flow is recorded in `sessions_dead_letter` with
-  `reason = 'late_arrival'`. An analyst can find it with the NFQL
-  query above.
+- **Truly late arrivals** — a flow that shows up after its session
+  closed simply opens a new session for the same endpoints: closed
+  sessions are immutable and never re-opened.
 
 A spike of late-arrival entries usually signals exporter clock
 drift or a too-short `sessions.grace`.
@@ -286,12 +277,11 @@ See [web-gui.md](web-gui.md#cockpit) for the visual indicators and
 [operations.md](operations.md#monitoring) for the `obserae-cli
 status` gauges.
 
-If obserae restarts, it reloads the sessions that were open at the
-last flush and replays recent flows (bounded by
-`sessions.recovery_window`) so long-running sessions are not
-truncated. Flows that were in flight but not yet stored at the
-moment of a crash are lost — the same small window the raw-flow
-buffer loses.
+If obserae restarts, the sessions that were open at that moment are
+**not** recovered — open-session state is RAM-only and rebuilt purely
+from the live flow stream as fresh flows arrive. The daemon runs 24/7,
+so only the steady state matters; the brief transient across a restart
+is accepted. Closed sessions already flushed stay durable.
 
 ---
 

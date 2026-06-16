@@ -89,7 +89,6 @@ Stages run **left-to-right**, like Unix pipes. A `WHERE` after a
 | `flows`                | Append-only, one row per NetFlow record.                                              | `time_received` |
 | `sessions`             | Bidirectional, role-aware consolidation, **per exporter**. Carries `correlation_id`. See [sessions.md](sessions.md). | `opened_at`     |
 | `sessions_consolidated`| One row per **conversation**: the per-exporter sessions of the same 5-tuple merged. `min`/`max` volumes across exporters + `coherence_pct`. | `opened_at`     |
-| `sessions_dead_letter` | Audit trail of flows rejected by the sessionizer (today: late arrivals).              | `dropped_at`    |
 | `session_matches`      | One row per (session, rule) hit. JOIN with `sessions` to recover endpoints.           | `matched_at`    |
 | `enrichment_ranges`        | CIDR catalogue (cloud + threat). `WITHIN`-join a flow set against `cidr`. See [enrichment.md](enrichment.md). | `fetched_at`    |
 | `enrichment_ips`        | Insert-time dimension: one row per `(ip, source)` resolved at ingest. **Equi-join** on the IP — see [enrichment.md](enrichment.md#faster-the-enrichment_ips-table). | `resolved_at`   |
@@ -237,7 +236,7 @@ picks the right interpretation:
 FROM flows | WHERE src_addr == "internet4" AND dst_addr == "loadbalancers"
 FROM flows | WHERE ip IN ("10.0.0.0/8", "host:proxy", "group:backends")
 
-FROM sessions | WHERE ip == "host:proxy" AND state == "active"
+FROM sessions | WHERE ip == "host:proxy"
 FROM sessions | WHERE server_ip == "group:databases" AND server_port == 5432
 
 # the dynamic side vs the fixed side of a DHCP segment
@@ -335,7 +334,13 @@ STATS <alias> = <fn>(<arg>) [, <alias> = <fn>(<arg>)]* [BY <col> [, <col>]*]
 ```
 
 - `<alias>` is **mandatory** — the output column is named after it.
-- `<fn>` is one of `COUNT`, `COUNT_DISTINCT`, `SUM`, `AVG`, `MIN`, `MAX`.
+- `<fn>` is one of `COUNT`, `COUNT_DISTINCT`, `SUM`, `AVG`, `MIN`, `MAX`,
+  and the statistical functions `STDDEV`, `MEDIAN`, `PERCENTILE(col, n)`
+  (n = the percentile rank, an integer `1..99` — `PERCENTILE(out, 95)`
+  is the 95th percentile). These three return fractional values.
+- A `BY` term can be a column **or** `BUCKET(time_col, seconds)` for a
+  time histogram — e.g. `... BY ip_a, BUCKET(opened_at, 60)` (the bucket
+  column is named `bucket`).
 - The output schema is the `BY` columns followed by the aliases.
   **Original columns are dropped** — downstream sees the new shape.
 
@@ -516,11 +521,17 @@ FROM sessions
   | SORT opened_at DESC
 ```
 
-### Currently active sessions to the database tier
+### Recent sessions to the database tier
+
+`FROM sessions` is closed-only — open sessions live in the sessionizer's
+RAM and never reach the table, so scope with `LAST` instead of a
+`state == "active"` filter. (For live/open counts, watch the cockpit
+gauges.)
 
 ```nfql
 FROM sessions
-  | WHERE state == "active" AND ip == "databases" AND port == 5432
+  | LAST 3600
+  | WHERE ip == "databases" AND port == 5432
   | KEEP ip_a, ip_b, ab_pkts, ba_pkts, opened_at
   | SORT opened_at DESC
 ```

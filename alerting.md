@@ -65,8 +65,12 @@ match the form exactly:
    | **Heartbeat** — fire when a primed query goes silent | the query returns **nothing** after it has previously returned data | catching outages — "my log collector went quiet" |
 
    For **Threshold** you also pick an **Operator** (`>`, `<`, `>=`,
-   `<=`, `==`) and a **Value (row count)**. For **First seen** you can
-   set an optional **Seen retention** in seconds.
+   `<=`, `==`) and a **Value**, plus a **Metric**: the default *rows*
+   compares how many rows the query returned, or you can pick a numeric
+   output column of the query (e.g. a `SUM`/`COUNT_DISTINCT` you named in
+   `STATS`) to compare its value instead — for example "outbound bytes
+   over 1 GiB". For **First seen** you can set an optional **Seen
+   retention** in seconds.
 4. **Severity** — info, low, medium, high, or critical.
 5. **Cadence** — how often the rule runs. The dropdown offers `10s`,
    `30s`, `1m`, `5m`, `15m`, `1h`. Run cheap, time-sensitive rules
@@ -86,6 +90,17 @@ That's it. obserae starts running the rule on its cadence.
 > runs they quietly learn (they won't alert), then start firing on
 > what's genuinely new or newly missing. This is automatic — there's
 > nothing to configure.
+
+> **One alert per entity: Group by.** By default a rule produces a
+> single alert for the whole result. Set **Group by** (1–3 of the
+> query's output columns, e.g. `ip_a`) to get **one alert per distinct
+> value** instead — one per scanning source, not one for all of them.
+> Cooldown, *First seen* and *Heartbeat* then all work per key, and each
+> alert is tagged with its key (shown as chips on the Detection page, and
+> filterable with `key:…`). A grouped *Threshold* must use a column
+> metric (not *rows*). The **Max keys** advanced field caps how many
+> distinct values are tracked (default 50 000) to protect memory on a
+> very wide key like an internet peer.
 
 ---
 

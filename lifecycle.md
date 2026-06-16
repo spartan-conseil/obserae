@@ -114,8 +114,7 @@ the automatic cadence keeps its own clock.
   `sessions_max_age`. Flows and archived sessions live in parquet, so
   eviction simply **drops whole time-partitions** (near-instant, never
   competing with live ingestion). Purging a session also removes its
-  correlation overlay row and ages out the dead-letter audit trail, so no
-  orphan rows are left behind.
+  correlation overlay row, so no orphan rows are left behind.
 
 ### The ages
 

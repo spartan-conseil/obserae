@@ -260,7 +260,6 @@ Useful checks to script:
 | `sessions open (live)` near its cap, or `sessions evicted` climbing   | The in-memory session map is under pressure — oldest sessions are being force-closed (`capacity`). A scan/flood, or `sessions.max_open_ksessions` is too small. |
 | `sessions_active + sessions_half_open` climbing across many ticks     | Sessions opening but never closing — check FIN/RST observability or timeouts      |
 | `sessions_half_open` ≫ `sessions_active`                              | Asymmetric capture (firewall drops?) or scan storm — both worth alerting          |
-| Non-zero `sessions_dead_letter` count in the last hour                | Late arrivals — typically exporter clock drift or `grace` tuned too short         |
 
 A simple parquet-backlog check:
 

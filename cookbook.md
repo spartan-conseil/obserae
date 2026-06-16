@@ -322,7 +322,7 @@ Both sides must filter on the same time window or the anti-join slides under it.
 
 ### FROM <table>
 
-**Intent.** Open a pipeline on a table. Tables: flows, sessions, session_matches, sessions_consolidated, sessions_dead_letter, enrichment_ranges, enrichment_ips, rules.
+**Intent.** Open a pipeline on a table. Tables: flows, sessions, session_matches, sessions_consolidated, enrichment_ranges, enrichment_ips, rules.
 
 ```nfql
 FROM <table>

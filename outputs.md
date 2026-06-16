@@ -21,7 +21,12 @@ Click **+ New output** and fill in the form.
 
 **For a webhook:**
 
-- **URL** — where to POST the alert.
+- **URL** — where to POST the alert. By default obserae refuses **internal**
+  destinations (localhost, `10.x`/`172.16.x`/`192.168.x`, the `169.254.x` cloud
+  metadata address, etc.) as a safety guard — saving such a URL returns an
+  error. To deliver to a destination on your own network (e.g. a LAN Gotify),
+  add its CIDR to `outputs.egress_allow_cidrs` in the config. See
+  [configuration.md](configuration.md).
 - **Method** — `POST` (default), `PUT` or `PATCH`.
 - **Custom headers** — one `Key: Value` per line (e.g.
   `Authorization: Bearer …`).

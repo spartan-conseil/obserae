@@ -3,7 +3,7 @@
 **A NetFlow collector with a built-in network map, detection rules, and
 a friendly query language — all in one self-contained binary.**
 
-obserae captures NetFlow v5/v9 exports from your routers, switches and
+obserae captures NetFlow v5/v9 and IPFIX exports from your routers, switches and
 hosts, stores them in DuckDB, and lets you investigate traffic by
 *name* (`src: backends, dst: postgres`) instead of by IP address. It
 ships with a web GUI for day-to-day work and a CLI for automation.
@@ -32,6 +32,7 @@ docker run -d \
 ```
 
 - **UDP 2055** — NetFlow v5/v9 ingest port (point your exporters here).
+- **UDP 4739** — IPFIX ingest port (point your IPFIX exporters here).
 - **TCP 8080** — Web GUI; open <http://localhost:8080> in your browser.
 - **`obserae-data` volume** — holds the database and the
   parquet buffer, so your data survives container restarts.

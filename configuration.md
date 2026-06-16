@@ -15,7 +15,12 @@ an error — defaults apply.
 
 ```yaml
 listen:
-  address: "0.0.0.0:2055"
+  netflow:
+    enabled: true
+    address: "0.0.0.0:2055"
+  ipfix:
+    enabled: true
+    address: "0.0.0.0:4739"
 
 storage:
   data_dir: "./data"
@@ -42,8 +47,15 @@ tuning recipes.
 
 ```yaml
 listen:
-  # UDP socket the collector binds. NetFlow v5/v9 commonly use 2055.
-  address: "0.0.0.0:2055"
+  # One UDP socket per flow protocol, each enabled/disabled and bound
+  # independently. Run a NetFlow-only or IPFIX-only collector by toggling
+  # 'enabled'. At least one protocol must stay enabled.
+  netflow:                    # NetFlow v5 and v9
+    enabled: true
+    address: "0.0.0.0:2055"   # NetFlow commonly uses 2055
+  ipfix:                      # IPFIX ("NetFlow v10")
+    enabled: true
+    address: "0.0.0.0:4739"   # IPFIX commonly uses 4739
 
 decoder:
   # Reserved for future per-exporter sharding. Set to 0 (default).
@@ -94,6 +106,13 @@ web:
   # on the cartography graph.
   carto_inactivity_threshold: 24h
 
+  # Secure flag on the session cookie. Leave unset (auto): behind an
+  # HTTPS reverse proxy the cookie is marked Secure automatically (a
+  # non-loopback bind, or the proxy's X-Forwarded-Proto: https). Set
+  # true to force it always; set false only for a deliberate plain-HTTP
+  # setup (cookies then travel without the Secure protection).
+  # secure_cookies: true
+
 matcher:
   # Cadence of the rule-matcher engine. Each tick is a single
   # transaction (join closed sessions × rule expansions).
@@ -118,6 +137,11 @@ outputs:
   backoff_base: 5s
   backoff_max: 1h
   delivery_retention: 168h   # forget delivered/dead rows after 7 days
+  # SSRF guard: by default the daemon refuses to deliver to internal
+  # destinations (loopback, 10/172.16/192.168, 169.254.x cloud metadata,
+  # IPv6 ULA, multicast). Allowlist a legitimate internal target by CIDR.
+  egress_block_internal: true
+  egress_allow_cidrs: []     # e.g. ["10.0.0.0/8"] for a LAN Gotify
 
 sessions:
   # Cadence of the session-consolidation engine.
@@ -138,11 +162,6 @@ sessions:
   # reached the oldest are force-closed (close_reason='capacity')
   # so memory stays bounded under a scan or flood.
   max_open_ksessions: 500
-
-  # After a restart, how far back to replay stored flows to rebuild
-  # the in-memory session state. Sessions open at the last flush are
-  # reloaded fully; only the catch-up replay is windowed.
-  recovery_window: 10m
 
   # Idle timeouts — when an open session closes for lack of new
   # packets. Tuned per protocol.
@@ -198,8 +217,7 @@ retention:
   # Rows deleted per statement. The runner loops until the set is
   # drained, so this never caps the purge — it only bounds how long any
   # single DELETE holds the writer connection (shared with ingestion).
-  # Purging sessions also cascades to sessions_correlation (orphans) and
-  # ages out sessions_dead_letter with the same cutoff.
+  # Purging sessions also cascades to sessions_correlation (orphans).
   batch_size: 50000
 
 backup:
@@ -239,7 +257,10 @@ corresponding YAML key.
 | Flag                       | Type         | Overrides              | Default                  |
 |----------------------------|--------------|------------------------|--------------------------|
 | `--config FILE`            | path         | —                      | empty                    |
-| `--listen ADDR`            | host:port    | `listen.address`       | `0.0.0.0:2055`           |
+| `--listen ADDR`            | host:port    | `listen.netflow.address` | `0.0.0.0:2055`         |
+| `--listen-ipfix ADDR`      | host:port    | `listen.ipfix.address` | `0.0.0.0:4739`           |
+| `--disable-netflow`        | bool         | `listen.netflow.enabled` | enabled                |
+| `--disable-ipfix`          | bool         | `listen.ipfix.enabled` | enabled                  |
 | `--buffer-max-records N`   | int (>0)     | `buffer.max_records`   | 10000                    |
 | `--buffer-max-age D`       | Go duration  | `buffer.max_age`       | `5s`                     |
 | `--data-dir DIR`           | path         | `storage.data_dir`     | `./data`                 |
@@ -264,7 +285,7 @@ The daemon refuses to start if any of these fails:
 - `control.socket` is empty.
 - `matcher.interval` ≤ 0.
 - `sessions.interval`, `sessions.grace`, `sessions.hard_timeout` ≤ 0.
-- `sessions.max_open_ksessions` or `sessions.recovery_window` ≤ 0.
+- `sessions.max_open_ksessions` ≤ 0.
 - Any `sessions.idle.*` value ≤ 0.
 - `correlation.window` < 0 or `correlation.horizon` < 0 (when `correlation.enabled`).
 - `enrichment.cache_size` ≤ 0.

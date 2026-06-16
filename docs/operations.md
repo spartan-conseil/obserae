@@ -51,8 +51,8 @@ sudo install -m 0755 obserae-cli  /usr/local/bin/
 sudo useradd --system --home /var/lib/obserae --shell /usr/sbin/nologin obserae
 sudo install -d -o obserae -g obserae -m 0750 \
     /var/lib/obserae \
+    /var/lib/obserae/data \
     /var/lib/obserae/db \
-    /var/lib/obserae/parquet \
     /var/lib/obserae/run
 ```
 
@@ -62,13 +62,14 @@ sudo install -d -o obserae -g obserae -m 0750 \
 sudo install -d -m 0755 /etc/obserae
 sudo tee /etc/obserae/obserae.yaml > /dev/null <<'YAML'
 listen:
-  address: "0.0.0.0:2055"
+  netflow:
+    enabled: true
+    address: "0.0.0.0:2055"
 control:
   socket: "/var/lib/obserae/run/obserae.sock"
 storage:
+  data_dir: "/var/lib/obserae/data"
   duckdb_path: "/var/lib/obserae/db/obserae.duckdb"
-buffer:
-  directory: "/var/lib/obserae/parquet"
 web:
   enabled: true
   address: "127.0.0.1:8080"        # behind a reverse proxy for TLS+auth
@@ -192,6 +193,10 @@ alias obserae-cli='/usr/local/bin/obserae-cli --socket /var/lib/obserae/run/obse
 
 ## Audit log
 
+> **Enterprise feature — free during the alpha.** The Audit log is a planned
+> Enterprise feature, fully usable now at no cost while obserae is in alpha.
+> See [Licensing & transparency](../LICENSING.md).
+
 The **Audit log** page (sidebar → *Audit log*) is the tamper-evident record of
 *who did what, when*. Every sensitive action — cartography/rules/users/lifecycle
 changes, logins and logouts, denied requests — is written to an append-only
@@ -287,7 +292,7 @@ Two things to back up:
    ```
 
    This single YAML (cartography, flow matrix, alerting, outputs,
-   enrichment, exporters, backup, retention, simulation) is enough to
+   enrichment, exporters, backup, retention) is enough to
    rebuild the operator state on a fresh daemon. The `flows` history
    itself is only in the
    DuckDB file.

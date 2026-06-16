@@ -4,9 +4,6 @@ obserae is a self-contained daemon plus a small admin CLI. This page
 covers the two supported install paths (Docker and pre-built
 binaries), plus the basics of pointing your NetFlow exporters at it.
 
-> obserae is **proprietary, free-to-use software**. Use the published Docker image or the
-> release binaries below.
-
 ---
 
 ## System requirements
@@ -14,10 +11,10 @@ binaries), plus the basics of pointing your NetFlow exporters at it.
 | Resource | Recommended                                                          |
 |----------|----------------------------------------------------------------------|
 | OS / CPU | Linux, **amd64 or arm64** (incl. Raspberry Pi 4/5 and ARM servers)   |
-| Memory   | 512 MB minimum, 2 GB+ for production                                 |
+| Memory   | 1GB minimum, 2 GB+ for production                                 |
 | Disk     | Sized for your retention — DuckDB stores flows compactly (~50–200 bytes per flow record) |
 | CPU load | 1 core is enough for most homelabs; 2–4 cores for production         |
-| Network  | UDP port for NetFlow (default 2055), TCP port for the GUI (default 8080) |
+| Network  | UDP ports for NetFlow (default 2055) and IPFIX (default 4739), TCP port for the GUI (default 8080) |
 
 obserae runs entirely on disk — no Elasticsearch, no Kafka, no Redis.
 The only external dependency at runtime is the IP-enrichment HTTPS
@@ -37,21 +34,38 @@ docker run -d \
   --name obserae \
   --restart unless-stopped \
   -p 2055:2055/udp \
-  -p 8080:8080/tcp \
+  -p 4739:4739/udp \
+  -p 127.0.0.1:8080:8080/tcp \
   -v obserae-data:/var/lib/obserae \
   ghcr.io/spartan-conseil/obserae:latest
 ```
 
 What that does:
 
-- Forwards **UDP 2055** (NetFlow ingest) and **TCP 8080** (web GUI)
-  from the host to the container.
+- Forwards **UDP 2055** (NetFlow ingest), **UDP 4739** (IPFIX ingest)
+  and **TCP 8080** (web GUI, localhost) from the host to the container.
 - Mounts a named volume at `/var/lib/obserae` for the DuckDB file
   and the parquet buffer, so data survives container restarts.
 - Loads the image's default `obserae.yaml`, pre-configured for
   container paths.
 
 Open <http://localhost:8080> to reach the web GUI.
+
+> **The login keeps bouncing back to the login page (remote / plain HTTP)?**
+> This is the single most common Docker gotcha. The container binds the GUI on
+> all interfaces, so the session cookie is marked **`Secure`** by default — and a
+> browser silently **drops** a `Secure` cookie received over plain `http://` from
+> a remote IP. So your password is accepted but the session never sticks and you
+> loop. (It works from `http://localhost:8080` only because browsers treat
+> *localhost* as a secure context.) Two fixes:
+>
+> - **Recommended — put TLS in front.** Front obserae with a reverse proxy
+>   (Caddy, nginx, Traefik) terminating HTTPS and forwarding
+>   `X-Forwarded-Proto: https`. The cookie stays `Secure` and login works.
+> - **Plain-HTTP LAN deployment** (no TLS, trusted network): mount a config with
+>   `web.secure_cookies: false`. The login then works over plain HTTP, but the
+>   session cookie travels **unprotected** — only do this on a trusted network.
+>   See [configuration.md](configuration.md#expose-the-web-gui-on-the-network).
 
 ### Run as a non-root host user
 
@@ -67,7 +81,8 @@ docker run -d \
   --restart unless-stopped \
   --user "$(id -u):$(id -g)" \
   -p 2055:2055/udp \
-  -p 8080:8080/tcp \
+  -p 4739:4739/udp \
+  -p 127.0.0.1:8080:8080/tcp \
   -v "$(pwd)/obserae-data:/var/lib/obserae" \
   ghcr.io/spartan-conseil/obserae:latest
 ```
@@ -78,39 +93,52 @@ docker run -d \
 docker run -d \
   --name obserae \
   -p 2055:2055/udp \
-  -p 8080:8080/tcp \
+  -p 4739:4739/udp \
+  -p 127.0.0.1:8080:8080/tcp \
   -v "$(pwd)/obserae.yaml:/etc/obserae/obserae.yaml:ro" \
   -v obserae-data:/var/lib/obserae \
   ghcr.io/spartan-conseil/obserae:latest \
   --config /etc/obserae/obserae.yaml
 ```
 
+### Docker Compose with TLS (Caddy) — recommended for remote access
+
+For anything beyond `http://localhost`, run obserae behind a TLS reverse proxy so
+the GUI login works (see the login-loop note above). A turnkey
+**obserae + [Caddy](https://caddyserver.com/)** stack ships in the
+[`docker-compose/`](../docker-compose/) directory — it brings up HTTPS on `:443`
+with a self-signed certificate, **no domain or DNS required**:
+
+```sh
+cd docker-compose
+docker compose up -d
+
+# first-boot admin password (printed once)
+docker compose logs obserae | grep "generated admin password"
+```
+
+Open **<https://ip>** and click through the one-time "not trusted" warning
+(self-signed CA). Caddy terminates TLS and forwards `X-Forwarded-Proto: https`, so
+obserae keeps the session cookie `Secure` and the login sticks.
+
+What the stack runs:
+
+- **obserae** — publishes only the flow-ingest ports (`2055/udp`, `4739/udp`) to
+  the host; the GUI (`8080`) is reachable **only** through Caddy, never as plain
+  HTTP.
+- **caddy** — serves the GUI over HTTPS on `:443` (and `:80`, used only when you
+  switch to a real domain).
+
+**Real domain + browser-trusted certificate.** Edit the bundled `Caddyfile`:
+swap the self-signed block for the commented production block (your domain →
+`reverse_proxy obserae:8080`), point the domain's DNS at this host, and make ports
+80 and 443 reachable from the internet. Caddy then provisions and auto-renews a
+Let's Encrypt certificate — no more warnings.
+
 ### Run the admin CLI against the container
 
 ```sh
 docker exec -it obserae obserae-cli status
-```
-
-### docker-compose
-
-```yaml
-# docker-compose.yml
-services:
-  obserae:
-    image: ghcr.io/spartan-conseil/obserae:latest
-    container_name: obserae
-    restart: unless-stopped
-    ports:
-      - "2055:2055/udp"
-      - "8080:8080/tcp"
-    volumes:
-      - obserae-data:/var/lib/obserae
-      # Optional: mount your own config
-      # - ./obserae.yaml:/etc/obserae/obserae.yaml:ro
-    # command: ["--config", "/etc/obserae/obserae.yaml"]
-
-volumes:
-  obserae-data:
 ```
 
 ---
@@ -163,71 +191,20 @@ For a long-running install, see
 
 ---
 
-## After installing — point NetFlow at obserae
+## After installing — send flows to obserae
 
-obserae listens on UDP 2055 by default. Configure each exporter to
-send v5 or v9 flows to `<obserae-host>:2055`.
+obserae listens on **UDP 2055** (NetFlow v5/v9) and **UDP 4739** (IPFIX). Point
+each device or software probe at `<obserae-host>` on the matching port.
 
-### MikroTik / RouterOS
-
-```routeros
-/ip traffic-flow
-set enabled=yes
-/ip traffic-flow target
-add address=<obserae-host>:2055 version=9
-```
-
-### Cisco IOS / IOS-XE
-
-```cisco
-flow exporter OBSERAE
- destination <obserae-host>
- transport udp 2055
- export-protocol netflow-v9
-
-flow monitor MONITOR
- exporter OBSERAE
- record netflow ipv4 original-input
-
-interface GigabitEthernet0/1
- ip flow monitor MONITOR input
-```
-
-### pfSense / OPNsense
-
-Install the `softflowd` package, then in the GUI: *Services →
-softflowd* → set host to `<obserae-host>`, port to `2055`, version
-to `9`.
-
-### Linux host (via `softflowd`)
-
-```sh
-sudo apt install softflowd
-sudo softflowd -i <if>> -n <obserae-host>:2055 -v 9
-```
-
-### Verifying it works
-
-Run obserae's status command and watch the `flows` counter grow:
-
-```sh
-./obserae-cli --socket ./data/obserae.sock status
-```
-
-If after a couple of minutes the counter stays at 0:
-
-- Is UDP 2055 open on the obserae host?
-  `sudo ss -ulnp | grep 2055`
-- Is anything actually being sent?
-  `sudo tcpdump -ni any udp port 2055 -c 5`
-
-If `tcpdump` shows traffic but the counter stays at 0, look at the
-daemon log — it prints decode errors at the default verbosity.
+Per-device setup for Cisco, Juniper, MikroTik, FortiGate, Palo Alto,
+pfSense/OPNsense, Open vSwitch, host probes and many more — and how to confirm
+flows are arriving — has its own page: **[Configuring Exporters](exporters.md)**.
 
 ---
 
 ## Next steps
 
+- [exporters.md](exporters.md) — configure your devices and probes to send flows.
 - [quickstart.md](quickstart.md) — your first cartography, first
   rules, and first query.
 - [configuration.md](configuration.md) — full configuration reference.

@@ -22,22 +22,26 @@ looking at.
 │  obserae   [● daemon up]  [⚡ flows/s]              [Ctrl+K palette] │  topbar
 ├────────────┬─────────────────────────────────────────────────────────┤
 │ ▣ Cockpit  │                                                         │
-│ ✦ Carto    │                                                         │
-│ ▦ Flow Mtx │                  Page content                           │
-│ ≈ Simul.   │                                                         │
-│ ◫ Sessions │                                                         │
-│ ✶ Query    │                                                         │
-│ ◆ Rules    │                                                         │
-│ ◬ Detection│                                                         │
-│ ⇨ Outputs  │                                                         │
-│ ⇅ Sources  │                                                         │
-│ ⧗ Lifecycle│                                                         │
-│ ⇄ Config IO│                                                         │
-│ ◉ Users    │                                                         │
+│ NETWORK   ▾│                                                         │
+│   Cartography                                                        │
+│   Flow Matrix                Page content                            │
+│ ANALYSIS  ▸│                                                         │
+│ CONNECTORS▸│   (Investigation · Sessions · Rules · Detection)        │
+│ ❒ Audit log│   (Sources · Outputs)                                   │
+│ SETTINGS  ▾│                                                         │
+│   Users · Storage · Retention · Backup · Config I/O                  │
 └────────────┴─────────────────────────────────────────────────────────┘
 ```
 
-Click any item in the sidebar to switch page.
+The sidebar is an **accordion**: pages are grouped under four
+collapsible themes — **Network** (Cartography, Flow Matrix),
+**Analysis** (Investigation, Sessions, Rules, Detection),
+**Connectors** (Sources, Outputs) and **Settings** (Users, Storage,
+Retention, Backup, Config I/O) — with **Cockpit** and **Audit log** as
+direct top-level links. The group holding the page you are on opens
+automatically; you can expand or collapse any group by clicking its
+header, and obserae remembers your choice across pages. Click any item
+to switch page.
 
 The **topbar** is always visible. It shows a live indicator for the
 daemon (green = up, red = unreachable) and the current ingest rate
@@ -412,7 +416,7 @@ The full enrichment mechanism is described in
 `⇄ Config I/O` (`/config-io`) is the **one place** to export and
 import your whole operator configuration as a single YAML file —
 it replaces the per-page YAML File menus that used to live on
-Carto, Flow Matrix, Rules and Flow Simulation.
+Carto, Flow Matrix and Rules.
 
 The file has one top-level key per domain, each in the format that
 domain already used:
@@ -421,7 +425,6 @@ domain already used:
 cartography: { networks: [...], hosts: [...], groups: [...] }
 flow_matrix: { rules: [...] }
 alerting:    { queries: [...], rules: [...] }
-simulation:  { enabled: true, sources: [...] }
 outputs:     [ ... ]
 enrichment:  { enabled: true, sources: [...] }
 exporters:   [ ... ]
@@ -458,70 +461,48 @@ alerting rules, since those reference topology by name.
 
 ---
 
-## Lifecycle
+## Storage, Retention & Backup
 
-Everything that *manages data over time*: retention, backup and
-storage footprint. Three tabs (Storage / Retention / Backup). See
+Everything that *manages data over time* lives under the **Settings**
+group in the sidebar, as three separate pages. See
 [lifecycle.md](lifecycle.md) for the full walkthrough.
 
 > Retention and backup changes made here persist across restarts
 > (stored in `app_settings`), so they no longer revert to
 > `obserae.yaml` on reboot.
 
-### Storage tab
+### Storage
 
 The on-disk footprint: DuckDB file size, free disk space on the
-mount, byte totals for the parquet buffer and backup directories.
-Polled every 10 seconds — these values move slowly. Use this tab
-to size the retention policy below, or to confirm the backup
-directory isn't ballooning past its rotation cap.
+mount, byte totals for the parquet stores and backup directory.
+Polled every 10 seconds — these values move slowly. Use this page
+to size the retention policy, or to confirm the backup directory
+isn't ballooning past its rotation cap.
 
-### Retention tab
+### Retention
 
-Periodic purge of stale rows from `flows` and `sessions`. **Off by
-default** — flip the master switch only after you have picked at
-least one max age. Changes take effect on the next sweep; no
-restart needed.
+Periodic purge of stale rows from `flows`, `sessions` and the audit
+log. **Off by default** — flip the master switch only after you have
+picked at least one max age. Changes take effect on the next sweep;
+no restart needed.
 
-### Backup tab
+### Backup
 
 Periodic native DuckDB snapshots of the whole database, landing
 under the configured directory. Rotation enforces the two limits
 you set (max age and/or max files). A **Backup now** button writes
-one snapshot immediately; the file listing below refreshes as soon
-as it lands, and a snapshot can be restored from here.
-
----
-
-## Simulation
-
-A built-in NetFlow simulator. Generates synthetic traffic against
-your cartography so you can develop detection rules without waiting
-for real exporters, or rehearse an incident with a known scenario.
-
-What you configure:
-
-- A **traffic profile** — pick one of the built-in profiles
-  (homelab, multi-tier app, scan storm) or build a custom one.
-- A **rate** — flows per second to inject.
-- A **duration** — `1m`, `5m`, `1h`, or run indefinitely.
-
-Simulated flows enter the **same pipeline** as real exporters —
-they are sessionized, enriched, matched against rules, and shown on
-the cartography, exactly like real NetFlow. They produce genuine
-**sessions**, not just raw flow rows. The only difference is the
-`sampler_address` (a fixed loopback IP) so you can distinguish them
-at query time:
-
-```nfql
-FROM flows | WHERE sampler_address == "127.0.0.1"
-```
-
-Stop the simulator and the live traffic resumes as before.
+one snapshot immediately; the timeline below shows the snapshot
+chain, and any point can be previewed and restored from here.
 
 ---
 
 ## Users & Access
+
+> **Enterprise feature — free during the alpha.** Multiple user accounts, groups,
+> role-based access (RBAC) and API-token management are a planned Enterprise
+> feature, fully usable now at no cost while obserae is in alpha. The single
+> administrator login the GUI always requires is part of the core product. See
+> [Licensing & transparency](../LICENSING.md).
 
 The **Users** page (visible only to administrators) manages who can sign in
 and what they can do. It has three tabs, each laid out like the Flow Matrix: a

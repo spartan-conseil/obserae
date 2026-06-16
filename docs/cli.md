@@ -133,7 +133,7 @@ enrichment resolver's cache versus its capacity.
 Bulk import / export / validate of the **whole configuration** as one
 YAML bundle — the CLI pendant of the GUI's Config I/O page (same file).
 One top-level key per domain: `cartography`, `flow_matrix`, `alerting`,
-`simulation`, `outputs`, `enrichment`, `exporters`, `backup`, `retention`.
+`outputs`, `enrichment`, `exporters`, `backup`, `retention`.
 
 ```sh
 obserae-cli config validate FILE     # checks only, no write
@@ -564,6 +564,10 @@ exit-after-swap rationale are documented there too.
 The `user` group administers GUI accounts, groups, API tokens and the admin
 password — the same model as the GUI [Users page](web-gui.md#users--access),
 usable headless (e.g. to recover access).
+
+> Multiple users and RBAC are a planned **Enterprise** feature — free during the
+> alpha (see [Licensing & transparency](../LICENSING.md)). Single-admin recovery
+> below is part of the core product.
 
 ```sh
 # Recover access: generate a fresh admin password (printed once).

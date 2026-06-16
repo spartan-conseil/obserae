@@ -1,86 +1,87 @@
 # obserae
 
-**A NetFlow collector with a built-in network map, detection rules, and
-a friendly query language — all in one self-contained binary.**
+obserae is a self-hosted NetFlow/IPFIX collector for people who need to
+understand real network traffic without building a whole data platform first.
+It receives exports from routers, firewalls and hosts, stores them locally, and 
+lets you investigate traffic by name: `src: backends, dst: postgres` instead of 
+memorising addresses.
 
-obserae captures NetFlow v5/v9 and IPFIX exports from your routers, switches and
-hosts, stores them in DuckDB, and lets you investigate traffic by
-*name* (`src: backends, dst: postgres`) instead of by IP address. It
-ships with a web GUI for day-to-day work and a CLI for automation.
+It ships as one daemon plus a small admin CLI. The browser UI is there for
+daily work: cartography, sessions, NFQL queries, detection rules, alerting,
+outputs, users, retention and backups.
 
----
+obserae runs on Linux `amd64` and `arm64`, including Raspberry Pi 4/5 and ARM
+servers.
 
-obserae runs on **Linux, amd64 and arm64** — including modern
-Raspberry Pi (4 / 5) and ARM servers.
+> **Closed source, free to use.** obserae ships as proprietary binaries and
+> Docker images — the source code is not public. It is **free** for personal use
+> and for small businesses, and it is currently **in alpha**, so every feature is
+> open while it stabilises. **No telemetry, no license server, runs fully
+> offline.** Details: [Licensing & transparency](LICENSING.md).
 
-## Quick install
+## Quick Install
 
-### Option 1 — Docker (recommended)
+### Docker
 
-The image is multi-arch: Docker automatically pulls the right build
-for your CPU (amd64 or arm64), so the same command works on a server
-or a Raspberry Pi.
+This starts obserae with persistent storage and exposes the GUI only on the
+local machine:
 
 ```sh
 docker run -d \
   --name obserae \
   --restart unless-stopped \
   -p 2055:2055/udp \
+  -p 4739:4739/udp \
   -p 127.0.0.1:8080:8080/tcp \
   -v obserae-data:/var/lib/obserae \
   ghcr.io/spartan-conseil/obserae:latest
 ```
 
-- **UDP 2055** — NetFlow v5/v9 ingest port (point your exporters here).
-- **UDP 4739** — IPFIX ingest port (point your IPFIX exporters here).
-- **TCP 8080** — Web GUI; open <http://localhost:8080> in your browser.
-- **`obserae-data` volume** — holds the database and the
-  parquet buffer, so your data survives container restarts.
-
-To run as a non-root host user (recommended), add
-`--user $(id -u):$(id -g)` and bind-mount a directory you own instead
-of a named volume. See
-[installation.md](installation.md#run-as-a-non-root-host-user) for
-the details.
-
-### Option 2 — Pre-built binaries
-
-Download the tarball for your architecture from the
-[latest release](https://github.com/spartan-conseil/obserae/releases/latest):
+Open <http://localhost:8080>. On first boot, the daemon creates the `admin`
+user and prints a generated password once in the container logs:
 
 ```sh
-# amd64 — most servers, desktops, mini-PCs
+docker logs obserae | grep "generated admin password"
+```
+
+For a LAN or internet-facing GUI, do not publish plain HTTP directly. Put TLS in
+front; the ready-to-run Caddy example lives in
+[docker-compose/](docker-compose/).
+
+### Release Tarball
+
+Download the latest Linux tarball for your CPU:
+
+```sh
+# amd64: most servers, desktops, mini-PCs
 curl -L -o obserae.tar.gz \
   https://github.com/spartan-conseil/obserae/releases/latest/download/obserae_linux_amd64.tar.gz
 
-# arm64 — Raspberry Pi 4/5, ARM servers
+# arm64: Raspberry Pi 4/5, ARM servers
 curl -L -o obserae.tar.gz \
   https://github.com/spartan-conseil/obserae/releases/latest/download/obserae_linux_arm64.tar.gz
 
 tar xzf obserae.tar.gz
 cd obserae_linux_*
-
-# Run with the bundled minimal config
 mkdir -p data
 ./obserae --config obserae.yaml
 ```
 
-Each tarball contains the `obserae` daemon, the `obserae-cli` admin
-tool, a ready-to-use `obserae.yaml`, the EULA, and the full
-documentation under `docs/`.
+Not sure which architecture you need? `uname -m` prints `x86_64` for amd64 and
+`aarch64` for arm64.
 
-> **Not sure which architecture?** Run `uname -m`: `x86_64` → amd64,
-> `aarch64` → arm64.
+## Minimal Config
 
----
-
-## Simplest config
-
-The minimal `obserae.yaml` needed to run looks like this:
+This is enough for a local first run:
 
 ```yaml
 listen:
-  address: "0.0.0.0:2055"     # NetFlow ingest port
+  netflow:
+    enabled: true
+    address: "0.0.0.0:2055"
+  ipfix:
+    enabled: true
+    address: "0.0.0.0:4739"
 
 storage:
   data_dir: "./data"
@@ -91,89 +92,101 @@ control:
 
 web:
   enabled: true
-  address: "127.0.0.1:8080"   # Web GUI bound to localhost only
+  address: "127.0.0.1:8080"
 ```
 
-That's it. Everything else uses sensible defaults. The full reference
-with every tunable lives in [configuration.md](configuration.md).
+The GUI always requires a login. The `127.0.0.1` bind keeps it local; if you
+change it to `0.0.0.0:8080`, put a reverse proxy with TLS in front. The session
+cookie is marked `Secure` automatically for non-loopback deployments, so remote
+plain-HTTP access usually looks like a login loop. That is a browser protecting
+the cookie, not a bad password.
 
-> **About the web GUI:** it binds to `127.0.0.1` by default — only
-> the local machine can reach it. To expose it on the network, put it
-> behind a reverse proxy that does TLS and authentication, then
-> change the address to `0.0.0.0:8080`. There is no built-in auth.
+## First Checks
 
----
-
-## Verify it works
-
-Once the daemon is running, point one or more devices at UDP 2055
-and watch the counters move:
+[Point a NetFlow exporter at UDP 2055 or an IPFIX exporter at UDP 4739](docs/exporters.md), then
+check the daemon:
 
 ```sh
 ./obserae-cli --socket ./data/obserae.sock status
 ```
 
-Open the web GUI at <http://localhost:8080> to see the cockpit.
+From there, open the GUI and start with the Cockpit, Cartography and Query
+pages. The [quickstart](docs/quickstart.md) walks through a small end-to-end
+setup.
 
----
+## Documentation
 
-## Documentation map
+### Getting Started
 
-### Getting started
+| Page | Start here when you want to... |
+|------|--------------------------------|
+| [Installation](docs/installation.md) | Install with Docker or binaries and get the daemon running. |
+| [Configuring Exporters](docs/exporters.md) | Configure routers, firewalls and host probes to send NetFlow/IPFIX to obserae. |
+| [Quickstart](docs/quickstart.md) | Build a tiny cartography, add rules, send traffic and run the first queries. |
+| [Configuration](docs/configuration.md) | Understand every YAML key and the practical tuning recipes. |
 
-| Page                                    | What it covers                                                    |
-|-----------------------------------------|-------------------------------------------------------------------|
-| [installation.md](installation.md)      | All install methods, system requirements, NetFlow exporter hints  |
-| [quickstart.md](quickstart.md)          | First flows ingested, first map, first query — in 10 minutes      |
-| [configuration.md](configuration.md)    | Every YAML key and CLI flag, with recipes                         |
+### Daily Use
 
-### Using obserae day-to-day
+| Page | What it helps with |
+|------|--------------------|
+| [Web GUI](docs/web-gui.md) | Know what each screen is for and where to click next. |
+| [CLI](docs/cli.md) | Automate admin tasks and recover access from the terminal. |
+| [Cartography](docs/cartography.md) | Describe networks, hosts, groups and services by name. |
+| [Sessions](docs/sessions.md) | Understand the bidirectional conversations built from raw flows. |
+| [NFQL](docs/nfql.md) | Query flows, sessions, enrichment and rule matches. |
+| [NFQL Cookbook](docs/cookbook.md) | Copy practical query patterns into the Investigation page. |
+| [Detection Rules](docs/rules.md) | Model allowed connectivity and inspect what matched. |
+| [Alerting](docs/alerting.md) | Turn saved NFQL queries into alerts. |
+| [Outputs](docs/outputs.md) | Send alerts to webhooks or Gotify. |
+| [Sources](docs/sources.md) | Label exporters and manage enrichment sources. |
+| [IP Enrichment](docs/enrichment.md) | Use cloud and threat-intel ranges in queries. |
+| [Lifecycle](docs/lifecycle.md) | Manage retention, storage and backups. |
 
-| Page                                    | What it covers                                                     |
-|-----------------------------------------|--------------------------------------------------------------------|
-| [web-gui.md](web-gui.md)                | Tour of every page in the web interface                            |
-| [cli.md](cli.md)                        | `obserae-cli` subcommand reference                                 |
-| [cartography.md](cartography.md)        | Describe your network so traffic shows up by name                  |
-| [rules.md](rules.md)                    | Write detection rules and inspect what they catch                  |
-| [nfql.md](nfql.md)                      | The NFQL query language — investigate traffic interactively        |
-| [alerting.md](alerting.md)              | Turn NFQL queries into alerts (Investigation → Rules → Detection)  |
-| [outputs.md](outputs.md)                | Export alerts to webhooks / Gotify (the Outputs page)              |
-| [sessions.md](sessions.md)              | How raw flows are folded into bidirectional, role-aware sessions   |
-| [enrichment.md](enrichment.md)          | Tag IPs with cloud-provider ranges (AWS / Azure / GCP)             |
-| [sources.md](sources.md)                | Label NetFlow exporters; manage cloud / threat-intel sources       |
-| [lifecycle.md](lifecycle.md)            | Storage usage, retention policy, periodic backups, manual I/O      |
+### Production
 
-### Running in production
+| Page | What it covers |
+|------|----------------|
+| [Operations](docs/operations.md) | systemd deployment, monitoring, backups, upgrades and troubleshooting. |
+| [Docker Compose TLS](docker-compose/) | Turnkey obserae + Caddy setup for HTTPS login. |
 
-| Page                                    | What it covers                                                     |
-|-----------------------------------------|--------------------------------------------------------------------|
-| [operations.md](operations.md)          | Deploy with systemd, monitor, back up, troubleshoot                |
+## What obserae Is Not
 
----
+obserae is not packet capture, a SIEM, or a SOAR. It never sees raw packets and
+does not ingest arbitrary logs. It works from NetFlow v5/v9 and IPFIX records,
+then gives you cartography, sessions, NFQL, connectivity rules and alert
+delivery on top.
 
-## What obserae is — and is not
+## License and transparency
 
-**obserae is** a NetFlow collector for teams that already have NetFlow
-exporters and want a self-hosted way to understand and detect what
-those exporters see, without spinning up Elasticsearch or buying a
-commercial NDR.
+obserae is **closed-source, free-to-use** software published by Spartan Conseil;
+the binaries and Docker images are proprietary and the source is not public. The
+project is currently **in alpha** (pre-1.0): every feature is open and free while
+it stabilises.
 
-**obserae is not** a packet capture tool, an SIEM, or a SOAR. It works
-exclusively on NetFlow records (v5 and v9) — it never sees raw
-packets. There is no log ingestion and no commercial threat-intel —
-detection runs on NFQL alert rules, and alerts are delivered through
-webhook and Gotify [outputs](outputs.md).
+What that means in practice — and what the bundled EULA commits to in writing:
 
----
+- **Free for you.** Free for personal use and for small businesses (a group of
+  **≤ 20 people and ≤ €2,000,000** revenue). Larger organisations, managed
+  service providers and paid services built on obserae need a commercial license
+  (<licensing@spartan-conseil.fr>) — everything stays freely usable during the alpha.
+- **No telemetry, no phone-home, no license server.** The EULA commits to it: no
+  usage telemetry, no outbound contact with the publisher's (or anyone's) servers,
+  no online license verification. obserae runs fully air-gapped.
+- **Your data is yours.** Flows, cartography, rules, sessions and reports are your
+  sole property; the publisher has no access and claims no rights over them.
+- **No remote kill-switch.** If the project ever stopped, your install keeps
+  working — there is no license check to fail and nothing to phone home to.
+- **Versioned, never retroactive.** The terms that ship with your version are
+  yours to keep — any future change applies only to future versions.
 
-## License & support
+A few features — **user management & RBAC**, the **audit log**, **connectors to
+major commercial platforms** (e.g. a SIEM such as QRadar) and **premium
+IP-enrichment sources** — are planned **Enterprise** features. They are **free
+and open during the alpha**; we flag them now so their future licensing is no
+surprise.
 
-obserae is **proprietary, free-to-use software**. The terms are in
-the `EULA.txt` bundled with every release tarball and Docker image.
-The source code is not public.
+Full terms: `EULA.txt` (French, binding) / `EULA.en.txt` (English courtesy
+translation), bundled with every release and Docker image. Plain-language
+answers: **[Licensing & transparency FAQ](LICENSING.md)**.
 
-Bug reports and questions: open an issue at
-<https://github.com/spartan-conseil/obserae>.
-
-For installation help, see [installation.md](installation.md);
-for production deployments, see [operations.md](operations.md).
+Bug reports and questions: <https://github.com/spartan-conseil/obserae>.

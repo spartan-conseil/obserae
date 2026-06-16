@@ -267,8 +267,7 @@ the daemon detects it and exposes it in the GUI.
 The detector recognises three kinds of relations: `subset` (every
 match of A is also a match of B), `equal` (two rules cover the
 exact same flow set) and `overlap` (the rules intersect without
-containment). The full algorithm is described in
-[../docs/rules.md#rule-relations](../docs/rules.md#rule-relations).
+containment).
 
 The relations are recomputed automatically after every rule
 mutation **and** after every cartography mutation — moving a host

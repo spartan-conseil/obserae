@@ -21,6 +21,10 @@ name and an equipment type. Once labelled, every other page
 of the raw `sampler_address` IP — much easier to scan in an
 incident review.
 
+> This page labels devices that obserae has **already seen**. To
+> configure a device to *emit* flows toward obserae in the first
+> place, see [Configuring Exporters](exporters.md).
+
 ### How the list is populated
 
 The daemon discovers exporters **automatically** by aggregating
@@ -112,12 +116,5 @@ adding new feeds is on the roadmap.
 
 ## Where things live
 
-- **Schema** — the `exporters` table is described in
-  [docs/lifecycle.md](../docs/lifecycle.md) (the daemon-internal
-  reference).
 - **REST endpoints** — `/api/exporters` (list / patch / rescan)
-  and `/api/enrichment/*` (toggles, refresh). See
-  [docs/lifecycle.md](../docs/lifecycle.md) for the exact contract.
-- **Architecture** — [docs/architecture.md](../docs/architecture.md)
-  explains how the three runners (rescanner, enrichment worker,
-  matcher) sit alongside each other.
+  and `/api/enrichment/*` (toggles, refresh) back this page.

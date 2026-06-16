@@ -1,0 +1,46 @@
+# Turnkey obserae behind a Caddy TLS reverse proxy.
+# HTTPS login works out of the box — no certificate setup, no DNS.
+#
+#   cd docs-web/docker-compose
+#   docker compose up -d
+#   # open https://localhost  (accept the one-time browser warning — see Caddyfile)
+#
+# Get the first-boot admin password (printed once, on the very first start):
+#   docker compose logs obserae | grep "generated admin password"
+#
+# Point your exporters at this host: UDP 2055 (NetFlow v5/v9) or 4739 (IPFIX).
+# For a real domain + a browser-trusted certificate, see ./Caddyfile.
+
+services:
+  obserae:
+    image: ghcr.io/spartan-conseil/obserae:latest
+    container_name: obserae
+    restart: unless-stopped
+    # Flow ingest must be reachable from your routers / firewalls. The GUI
+    # (8080) is deliberately NOT published to the host — it is served only
+    # through Caddy on 443, so the plain-HTTP port is never exposed.
+    ports:
+      - "2055:2055/udp"   # NetFlow v5/v9
+      - "4739:4739/udp"   # IPFIX
+    volumes:
+      - obserae-data:/var/lib/obserae
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: obserae-caddy
+    restart: unless-stopped
+    depends_on:
+      - obserae
+    ports:
+      - "443:443"         # HTTPS GUI
+      - "443:443/udp"     # HTTP/3
+      - "80:80"           # only needed when you switch to a real domain (ACME)
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data      # persists the internal CA + issued certs across restarts
+      - caddy-config:/config
+
+volumes:
+  obserae-data:
+  caddy-data:
+  caddy-config:

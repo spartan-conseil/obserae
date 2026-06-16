@@ -1,0 +1,38 @@
+# obserae behind Caddy with automatic TLS.
+#
+# DEFAULT (this config): HTTPS on :443 for ANY host or IP, using Caddy's
+# built-in self-signed CA — instant, no domain, no DNS, no Let's Encrypt.
+#
+# Why the two extra directives:
+#   - `tls { issuer internal; on_demand }` mints a local certificate the first
+#     time each name/IP is requested. A bare ":443 { tls internal }" has NO
+#     hostname to mint a cert for and no on-demand, so Caddy presents nothing
+#     and aborts the handshake with "tlsv1 alert internal error".
+#   - `default_sni` makes Caddy still present a certificate when the client
+#     sends no SNI at all — which is the case when you connect by bare IP
+#     (curl https://127.0.0.1, or a browser pointed at a LAN IP).
+#
+# Your browser shows a one-time "not trusted" warning (self-signed CA), plus a
+# name-mismatch notice if you connect by IP — click through. TLS still encrypts
+# the connection and Caddy forwards X-Forwarded-Proto: https, so obserae keeps
+# the session cookie Secure and the login works (no more login loop).
+{
+	default_sni localhost
+}
+
+:443 {
+	reverse_proxy obserae:8080
+	tls {
+		issuer internal
+		on_demand
+	}
+}
+
+# PRODUCTION — real domain + a browser-trusted certificate (no warnings).
+# Replace everything above with the block below: set your domain, point its
+# DNS at this host, and make sure ports 80 and 443 are reachable from the
+# internet. Caddy provisions and auto-renews a Let's Encrypt certificate.
+#
+# obserae.example.com {
+# 	reverse_proxy obserae:8080
+# }

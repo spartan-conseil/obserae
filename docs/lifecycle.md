@@ -1,17 +1,17 @@
-# Lifecycle
+# Storage, Retention & Backup
 
-The **Lifecycle** page is where you steer obserae's data
-footprint over time:
+Three pages under the **Settings** group in the sidebar let you steer
+obserae's data footprint over time:
 
-- watch how much disk the database, the parquet buffer and the
-  backups take;
-- enable **retention** to evict stale flows and sessions after
-  a configurable age;
-- enable **periodic full-database backups**, with rotation by
-  age and/or count.
+- **Storage** (`/storage`) — watch how much disk the database, the
+  parquet stores and the backups take;
+- **Retention** (`/retention`) — evict stale flows, sessions and
+  audit-log entries after a configurable age;
+- **Backup** (`/backup`) — take periodic full-database snapshots,
+  with rotation by age and/or count, and restore to any point.
 
-Open it from the sidebar (`⧗ Lifecycle`) or directly at
-`/lifecycle`. Three tabs: **Storage**, **Retention**, **Backup**.
+Open the **Settings** group in the sidebar to reach them (the group
+opens automatically when you are on one of these pages).
 
 > The retention and backup settings you change here are now
 > **persisted** (in the `app_settings` table) and survive a daemon
@@ -25,7 +25,7 @@ Open it from the sidebar (`⧗ Lifecycle`) or directly at
 
 ---
 
-## Storage tab
+## Storage page
 
 A live snapshot of where the bytes are. Polls every 10 seconds —
 the values move slowly so there's no point hammering them.
@@ -44,7 +44,7 @@ retention policy below.
 ### Backup directory section
 
 - **Snapshots** — cumulative size and file count of every backup snapshot
-  currently on disk. Cross-check with the **Files on disk** list in the Backup tab.
+  currently on disk. Cross-check with the **Files on disk** list on the Backup page.
 
 ### Parquet stores section
 
@@ -81,14 +81,14 @@ timeline (it is a reference catalogue, not time-series data).
 
 ---
 
-## Retention tab
+## Retention page
 
 **Off by default.** The daemon never auto-evicts data unless you
 opt in. That's intentional: a fresh install accumulates so an
 analyst can investigate yesterday's flows on day three. Once you
 have a sense of the daily volume, come back here and turn it on.
 
-The tab has two parts: a **Status** section at the top (what's
+The page has two parts: a **Status** section at the top (what's
 happening) and a **Policy** section below (the age thresholds).
 
 ### Status
@@ -124,7 +124,7 @@ the automatic cadence keeps its own clock.
 | **Sessions max age**   | Drop rows from `sessions` whose `last_activity_at` is older than this. Default `2160h` (90 days). |
 | **Audit log max age**  | Drop audit-journal entries older than this. Default `0` — **the audit log is kept forever** unless you set a limit. Raise this deliberately: the audit trail is your forensic record. |
 
-All three are edited from the **Retention** tab as a number + unit
+All three are edited on the **Retention** page as a number + unit
 (hours / days / weeks / months) and accept Go duration strings under
 the hood (`168h`, not `7d`). Set a value to `0` to skip that store
 entirely (e.g. `0` on the audit log = "keep the audit trail forever").
@@ -154,7 +154,7 @@ that happens.
 
 ---
 
-## Backup tab
+## Backup page
 
 Periodic **transactional snapshots of the whole obserae state** —
 both the DuckDB database (rules, cartography, exporters, NetFlow
@@ -257,23 +257,13 @@ obserae-cli backup restore --point-in-time 2026-05-28T13:00:00Z --confirm
 > snapshot from the same version.
 
 The same operations are also available from a future GUI panel
-(Phase 4); for now use the CLI. The internal documentation has the
-chain algorithm and design decisions (see
-[docs/lifecycle.md](../docs/lifecycle.md#restore-phase-3)).
+(Phase 4); for now use the CLI.
 
 ---
 
 ## Where things live
 
-- **Daemon-internal reference** — [docs/lifecycle.md](../docs/lifecycle.md)
-  covers the schema, the runner internals (set-based SQL,
-  ticker cadence, atomic-pointer config swap) and the REST API
-  contract.
 - **YAML** — every knob on this page has a corresponding section
   in `configs/obserae.yaml` (`retention`, `backup`). The YAML
   values are the source of truth at daemon boot; runtime PATCH
   edits from this page don't get written back.
-- **Architecture** — [docs/architecture.md](../docs/architecture.md)
-  explains where the lifecycle runners sit relative to the
-  ingestion pipeline (writer-pool contention, set-based SQL,
-  parquet round-trip).

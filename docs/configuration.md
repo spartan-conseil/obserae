@@ -106,12 +106,16 @@ web:
   # on the cartography graph.
   carto_inactivity_threshold: 24h
 
-  # Secure flag on the session cookie. Leave unset (auto): behind an
-  # HTTPS reverse proxy the cookie is marked Secure automatically (a
-  # non-loopback bind, or the proxy's X-Forwarded-Proto: https). Set
-  # true to force it always; set false only for a deliberate plain-HTTP
-  # setup (cookies then travel without the Secure protection).
-  # secure_cookies: true
+  # Secure flag on the session cookie. Leave unset (auto): a non-loopback
+  # bind (0.0.0.0, e.g. Docker) marks the cookie Secure, as does a proxy's
+  # X-Forwarded-Proto: https. Set true to force it always.
+  #
+  # Set FALSE only for a deliberate plain-HTTP deployment. Symptom if you
+  # don't: reaching the GUI over plain http:// from a remote IP makes the
+  # login loop back to itself (the browser drops the Secure cookie; only
+  # localhost is exempt). With false, login works over HTTP but the cookie
+  # travels unprotected — trusted networks only.
+  # secure_cookies: false
 
 matcher:
   # Cadence of the rule-matcher engine. Each tick is a single
@@ -277,7 +281,7 @@ Durations follow Go conventions: `30s`, `2m`, `1h30m`, etc.
 
 The daemon refuses to start if any of these fails:
 
-- `listen.address` is empty.
+- No listener is enabled (`listen.netflow` and `listen.ipfix` both disabled), or an enabled protocol's `address` is empty.
 - `buffer.max_records` or `buffer.max_age` ≤ 0.
 - `storage.data_dir` is empty.
 - `storage.duckdb_path` is empty.
@@ -304,13 +308,14 @@ half-configured pipeline.
 
 ```yaml
 listen:
-  address: "0.0.0.0:2055"
+  netflow:
+    enabled: true
+    address: "0.0.0.0:2055"
 control:
   socket: "/var/lib/obserae/run/obserae.sock"
 storage:
+  data_dir: "/var/lib/obserae/data"
   duckdb_path: "/var/lib/obserae/db/obserae.duckdb"
-buffer:
-  directory: "/var/lib/obserae/parquet"
 web:
   address: "127.0.0.1:8080"
 logging:
@@ -371,20 +376,28 @@ web:
   address: "0.0.0.0:8080"
 ```
 
-**Then put a reverse proxy in front.** obserae has no built-in
-authentication or TLS. Without a proxy doing both, the GUI is open
-to anyone who can reach the port.
+**Then put a reverse proxy doing TLS in front.** obserae serves plain
+HTTP and has no built-in TLS. Without a proxy terminating HTTPS, the
+GUI travels in clear over the network.
 
-A minimal Caddy config:
+A minimal Caddy config (terminates TLS, forwards the scheme):
 
 ```caddyfile
 obserae.example.com {
     reverse_proxy localhost:8080
-    basicauth /* {
-        admin <htpasswd-hash>
-    }
 }
 ```
+
+Caddy automatically sends `X-Forwarded-Proto: https`, so obserae marks
+the session cookie `Secure` and login works.
+
+> **Login loops back to itself over plain HTTP?** When the bind is
+> non-loopback (`0.0.0.0`), obserae marks the session cookie `Secure` by
+> default — and browsers **drop** a `Secure` cookie received over plain
+> `http://` from a remote IP, so the login silently loops (localhost is
+> exempt, which is why it works locally). Either front it with TLS as
+> above, or, for a trusted plain-HTTP LAN deployment, set
+> `web.secure_cookies: false` (the cookie is then sent unprotected).
 
 ### Quiet vs verbose logs
 
@@ -408,7 +421,7 @@ something the YAML enabled.
 
 | Setting                 | Read at startup | Hot-reloadable | Notes                                                           |
 |-------------------------|-----------------|----------------|-----------------------------------------------------------------|
-| `listen.address`        | yes             | no             | Daemon must restart to rebind.                                  |
+| `listen.netflow.*`, `listen.ipfix.*` | yes | no | Daemon must restart to rebind. |
 | `buffer.*`              | yes             | no             | Flush thresholds fixed at startup.                              |
 | `storage.duckdb_path`   | yes             | no             | Changing it on a live install starts a new empty database.      |
 | `control.socket`        | yes             | no             | Recreated on every start.                                       |

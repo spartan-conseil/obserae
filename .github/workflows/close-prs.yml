@@ -1,0 +1,41 @@
+name: Close pull requests
+
+# obserae does not accept code contributions (see CONTRIBUTING.md). This public
+# repository holds documentation only, so any pull request is closed automatically
+# with a polite pointer to the issue tracker.
+#
+# We use `pull_request_target` (not `pull_request`) on purpose: it runs with the
+# base repository's token, which has the write permission needed to comment on and
+# close PRs opened from forks. It is safe here because the job never checks out or
+# executes the PR's code — it only calls the GitHub API.
+
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  close:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const number = context.payload.pull_request.number;
+            const body = [
+              "Thanks for taking the time to contribute!",
+              "",
+              "obserae **does not accept code contributions** — the source is proprietary and kept single-owner on purpose (see [CONTRIBUTING.md](https://github.com/spartan-conseil/obserae/blob/main/CONTRIBUTING.md)). This pull request is therefore being closed automatically; please don't take it personally.",
+              "",
+              "**Bug reports and feature ideas are very welcome, though** — please open an [issue](https://github.com/spartan-conseil/obserae/issues) instead. Thank you!",
+            ].join("\n");
+            await github.rest.issues.createComment({
+              owner, repo, issue_number: number, body,
+            });
+            await github.rest.pulls.update({
+              owner, repo, pull_number: number, state: "closed",
+            });

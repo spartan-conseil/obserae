@@ -120,6 +120,13 @@ You can:
 
 The Detection page updates live — a new alert appears without a reload.
 
+> **How alerts are stored.** Fired alerts are kept in an append-only log on
+> disk (the same kind of store as the audit log), not in the live database, so
+> alerting never slows down ingestion. Acknowledging, closing or deleting an
+> alert just records the new state — older entries are aged out automatically
+> by the **alert retention** setting (Settings → Retention, *Drop alerts older
+> than…*), so the log can't grow forever.
+
 ---
 
 ## Keeping an eye on your rules

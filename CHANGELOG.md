@@ -6,6 +6,20 @@ dates; binaries and Docker images for each version are on the
 [releases page](https://github.com/spartan-conseil/obserae/releases). This is a
 bird's-eye view, not an exhaustive commit log.
 
+## [Unreleased]
+
+- **Accordion sidebar**: pages are now grouped under collapsible themes —
+  **Network**, **Analysis**, **Connectors** and **Settings** — with Cockpit
+  and Audit log as direct links. The group for the page you're on opens
+  automatically, and your expand/collapse choices are remembered.
+- **Lifecycle split**: the old single Lifecycle page is now three pages under
+  Settings — **Storage**, **Retention** and **Backup**.
+- Removed the **Flow Simulator** and the empty **Settings** placeholder page.
+- Public documentation overhaul: `docs-web/` reorganised (landing README +
+  `docs/`), a comprehensive **Configuring Exporters** guide, and a
+  **Licensing & transparency** page.
+- Web-GUI hardening guidance (reverse-proxy TLS, secure-cookie behaviour).
+
 ## [0.19.0] — 2026-06-16
 
 - **IPFIX ingestion** alongside NetFlow v5/v9.

@@ -221,6 +221,40 @@ Access is gated by the `auditlog:read` permission (held by the built-in
 default. Entries land on disk under `<data_dir>/auditlog/`; CLI actions are
 attributed to the virtual `cli` user.
 
+### Proving integrity
+
+The journal is *tamper-evident*: each entry is cryptographically linked to the
+one before it (a SHA-256 hash chain), and closed files are anchored by
+HMAC-signed **seals** stored separately under `<data_dir>/auditlog_seals/`. Any
+attempt to edit, reorder, insert or delete an entry breaks the chain or a seal
+and is detected. The seal key (`<data_dir>/auditlog.key`, generated on first
+boot) is what makes a forged seal impossible — **back it up offline and keep it
+somewhere other than the audit directory.**
+
+You can check integrity three ways:
+
+- **In the GUI** — the **Verify integrity** button on the Audit log page reports
+  *intact* (with how many entries and seals were checked) or lists exactly where
+  the chain broke.
+- **From the CLI** — `obserae-cli verify-auditlog` runs the same check offline.
+- **At startup** — the daemon verifies the journal on boot and exposes the result
+  as `audit_integrity` in its health snapshot.
+
+For **incident response with obserae stopped** (e.g. on a copied evidence
+directory), a dependency-free Python script ships in the repo:
+
+```sh
+python3 tools/verify_auditlog.py \
+    --dir   /evidence/auditlog \
+    --seal-dir /evidence/auditlog_seals \
+    --key-file /secure/auditlog.key
+```
+
+It exits `0` when the journal is intact and `1` when it was tampered with, and
+with `--json` prints a full machine-readable report. See
+[docs/auditlog.md](https://github.com/spartan-conseil/obserae/blob/main/docs/auditlog.md)
+for the exact on-disk format.
+
 ## Monitoring
 
 `obserae-cli status --json` is the canonical health datapoint. Plug

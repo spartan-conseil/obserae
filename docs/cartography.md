@@ -20,7 +20,7 @@ instead of dragging IPs and CIDRs around.
 | **Host**      | A machine, identified by name. Carries interfaces and services.                  |
 | **Interface** | A `(host, name, network, IP)` tuple. The IP must belong to the network's CIDR.   |
 | **Service**   | A `(host, name, protocol, port, [interfaces])` tuple — a port on a host's interface(s). |
-| **Group**     | A named collection of hosts and/or other groups. Groups can nest.                |
+| **Group**     | A named collection of hosts and/or other groups. Groups can nest, and a host can belong to several groups at once (its node sits where the plates overlap). |
 
 ### One global namespace
 
@@ -56,6 +56,9 @@ networks:
 
 hosts:
   - name: "pg-01"
+    documentation: |               # optional free-form markdown (see below)
+      # pg-01
+      Primary **PostgreSQL** node. Nightly backup at 02:00.
     interfaces:
       - name: "eth0"
         network: "admin"
@@ -185,13 +188,58 @@ Adjust the name or any IP if you like, then **Clone**. The copy carries
 over every interface, service, interface binding, group membership and
 the source's colour/icon, and is selected on the graph once created.
 
-The **Orphan IPs** drawer (top-right toolbar button) lists every IP
-seen in traffic over the last 24 hours that has no interface yet.
-A small switch in the drawer header — labelled **All IPs** /
-**Declared only** — lets you hide the rows tagged
-`outside known CIDRs` and focus on the IPs that already fall inside
-one of your declared networks (the easiest ones to adopt). The
-filter is session-only: leaving the page resets it to "All IPs".
+#### Documenting an entity
+
+Every host, network and group can carry a **documentation** note written
+in **markdown** — a place for ownership, runbooks, or any context that
+belongs next to the topology (the short *description* on a network is a
+one-line summary; documentation is for the longer story).
+
+Click any node and the drawer shows a **Documentation** section with your
+markdown **nicely rendered** — headings, lists, tables, code blocks and
+links, not raw text. Two buttons sit there:
+
+- **Expand** opens the documentation full-size in a modal for comfortable
+  reading;
+- **Edit** (in both the drawer and the modal) opens a plain-text editor on
+  the raw markdown. Type, **Save**, and the rendered note refreshes.
+
+Documentation is part of your topology, so it is included whenever you
+export the cartography or the consolidated configuration — back it up and
+move it between instances like everything else.
+
+### Building the map from your traffic: the discovery funnel
+
+Two toolbar buttons turn observed flows into a cartography in two steps —
+first your networks, then your machines.
+
+**Network Discovery** (stage 1) looks at the traffic and proposes the
+**subnets** behind it. It works **only on non-routable (private) space**
+— RFC1918 (`10/8`, `172.16/12`, `192.168/16`), CGNAT (`100.64/10`) and
+IPv6 ULA (`fc00::/7`) — because those are the addresses that describe
+*your* segments; routable peers are external and handled by IP Discovery
+below. It clusters the private IPs it sees into candidate networks (a
+`/24` per LAN by default, widening to `/23`, `/22`… when it detects a
+contiguous, properly-aligned range), and lists each one with the number
+of distinct IPs and the traffic volume behind it. Click **+ Declare** to
+open the **+ Network** form pre-filled with the candidate's CIDR and a
+suggested name — review the name (you can change anything), then submit.
+The new network appears on the map and the candidate drops off the list.
+Subnets you have already declared are never proposed again.
+
+**IP Discovery** (stage 2, formerly *Orphan IPs*) lists every individual
+IP seen in traffic over the last 24 hours that has no interface yet —
+the machines to add as hosts. A switch in the drawer header — **All
+IPs** / **Declared only** — hides the rows tagged `outside known CIDRs`
+so you can focus on the IPs that already fall inside one of your declared
+networks (the easiest to adopt). Each row offers **+ Add** (create a new
+`?<ip>` host with its inferred services) or **⇢ Merge** (attach the IP as
+a new interface on an existing host). The filter is session-only:
+leaving the page resets it to "All IPs".
+
+Typical flow: open **Network Discovery**, declare the subnets it finds,
+then open **IP Discovery** — the IPs inside those new networks are now
+ready to adopt as hosts.
 
 ### Colours and icons
 
@@ -210,7 +258,7 @@ host/network/group you can set them straight away). In the form you can:
   is `set:name` (e.g. `mdi:router`, `logos:docker`). Use **Clear** to
   remove it.
 - **Set an OS badge** *(hosts only)* — a small second icon shown at the
-  **bottom-right** of the host, to mark its operating system
+  **bottom-left** of the host, to mark its operating system
   (`logos:ubuntu`, `logos:microsoft-windows-icon`, `simple-icons:apple`…).
   It keeps the logo's own colours. Search by name (try "ubuntu",
   "windows", "linux") in the **OS badge** section.
@@ -222,11 +270,42 @@ re-importing your YAML keeps every colour, icon and OS badge.
 
 ---
 
+### Alert & enrichment indicators
+
+The map tells you, at a glance, which hosts need attention. A small badge
+appears at the **bottom-right** of a host:
+
+- 🔺 **Red triangle** — the host has one or more **active alerts**
+  (a detection rule fired on it). This is the strongest signal.
+- 🔶 **Orange triangle** — the host has no alert, but one of its IPs is
+  listed in a **threat-intelligence** feed. Worth a look.
+- 🔵 **Blue info dot** — the host has no alert and no threat, but one of
+  its IPs is known to **IP enrichment** (e.g. a cloud provider range), or
+  it only has low-importance `info` alerts.
+
+**Hover** a badged host to see a quick summary of its alerts and
+enrichment. **Click** the host to open its drawer, which now shows:
+
+- an **Active alerts** list — each row links to the rule that fired
+  (*opens the Detection page filtered to that rule*) and a **Triggers**
+  link that opens Detection filtered to *this host*;
+- an **IP enrichment** table — the source (AWS, a threat feed…), what it
+  says, and the matching network range.
+
+The badges update live: they refresh whenever the cartography changes and
+whenever a new alert fires, so you never have to reload the page.
+
+> Hosts with only private (internal) IPs won't get an enrichment badge —
+> IP enrichment only classifies public addresses. Alerts, however, light
+> up any host regardless of its addressing.
+
+---
+
 ## DHCP networks
 
 Some segments — office LANs, Wi-Fi, guest networks — hand out
 addresses dynamically with DHCP. You can't model each lease as a
-host: they rotate constantly, and they'd flood the orphan list with
+host: they rotate constantly, and they'd flood the IP Discovery list with
 hundreds of `192.168.10.x` you'll never name.
 
 Instead, tell obserae which slice of the network is the DHCP pool.
@@ -246,15 +325,15 @@ flag for it — use the YAML or the GUI.
 
 Once a network has a DHCP range:
 
-- **Dynamic IPs stop being orphans.** An address seen in the pool
+- **Dynamic IPs stop being discovered.** An address seen in the pool
   shows up as `office · 192.168.10.142` across the Sessions and
   Riverview views — attached to the network, not flagged as unknown.
 - **Static reservations keep their name.** If you *do* declare an
   interface inside the pool (a printer, the gateway), it keeps its
   host name — the exact match always wins over the pool label.
-- **The orphan list stays clean.** Pool addresses no longer appear
+- **The IP Discovery list stays clean.** Pool addresses no longer appear
   there. (Network and broadcast addresses — the `.0` and `.255` of a
-  `/24`, for instance — are filtered from orphans too: they're never
+  `/24`, for instance — are filtered from IP Discovery too: they're never
   real machines.)
 - **The graph shows the pool.** On the Cartography page each network
   with a DHCP range gets a **hexagonal companion node** tethered to it

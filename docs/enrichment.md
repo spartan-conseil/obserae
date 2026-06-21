@@ -1,10 +1,12 @@
 # IP enrichment
 
 Enrichment tags the IPs obserae sees with contextual metadata:
-cloud-provider attribution (AWS / Azure / GCP) and open-source
-threat-intel feeds (FireHOL). Once enabled, every IP that appears in
-the GUI gets a small badge revealing who owns the range — and your
-NFQL queries can filter or join on it.
+cloud-provider attribution (AWS / Azure / GCP / Oracle / Cloudflare),
+open-source threat-intel feeds (FireHOL, Tor), country-level geolocation
+(GeoIP), and autonomous-system attribution (ASN).
+Once enabled, every IP that appears in the GUI gets a small badge
+revealing who owns the range — and your NFQL queries can filter or
+join on it.
 
 For example, a session to `52.x.x.x` shows up as
 **AWS / us-east-1 / EC2** instead of an opaque IPv4 address, and a
@@ -18,8 +20,22 @@ session to a known-bad address is flagged **threat / firehol_level1**.
 |------------------|----------|------------------------------------------------------------------------------------------------------|
 | AWS              | cloud    | Service (S3, EC2, AMAZON, CLOUDFRONT…) + region (us-east-1, eu-west-3…). ~15 000 prefixes.           |
 | Azure            | cloud    | Microsoft systemService + region (umbrella tags like `AzureCloud.francecentral` included). ~100 000 prefixes. |
-| Google           | cloud    | "Google Cloud" + scope (region name, or `global`). ~1 000 prefixes.                                  |
+| Google           | cloud    | GCP **compute** ranges only (`cloud.json`): "Google Cloud" + scope (region name, or `global`). ~1 000 prefixes. |
+| Google services (incl. DNS) | cloud | Google's **whole** published space (`goog.json`): the superset that also covers Google Public DNS (`8.8.8.0/24`), Search, Workspace. Use this if you want non-GCP Google IPs tagged. |
+| Oracle Cloud (OCI) | cloud | OCI public ranges, tagged with their region (e.g. `OCI / eu-frankfurt-1`). |
+| Cloudflare       | cloud    | Cloudflare's edge IP ranges (v4 + v6). Tags any IP fronted by Cloudflare. |
 | FireHOL Level 1  | threat   | Address space that should never appear in legitimate traffic (attackers, bogons, hijacked ranges).   |
+| Tor exit nodes   | threat   | IPs of Tor exit relays (the bulk exit list) — traffic leaving the Tor network.                       |
+| Tor relays       | threat   | IPs of all running Tor relays/bridges (onionoo), tagged with the node nickname.                      |
+| ASN (ip2asn)     | asn      | The owning autonomous system (AS number + organisation) of any public IP, e.g. `AS13335 CLOUDFLARENET`. Catches IPs no curated list covers (the `1.1.1.1` resolver, etc.). Refreshed weekly. |
+| GeoIP (RIR country) | geoip | The ISO country code of any public IP, from the regional internet registry data. Drives the country flag on Cartography hosts. Refreshed weekly. |
+
+> **Google Cloud vs Google services.** `Google Cloud` lists only GCP
+> compute/region prefixes — it does **not** include Google Public DNS
+> (`8.8.8.8`), which is general Google space, not GCP. Enable
+> **Google services** to have addresses like `8.8.8.8` recognised as
+> cloud. The two overlap on GCP ranges; enabling both is fine (a range
+> matched by both shows one tag per source).
 
 Every source fetches directly from the provider's (or project's)
 published list — no commercial subscriptions, no third-party brokers.
@@ -54,19 +70,24 @@ link-local, CGNAT and their IPv6 equivalents are skipped. Your
 
 Enrichment is **opt-out**: on a fresh install every source is already
 enabled and the daemon fetches each one at startup, so IPs are enriched
-without any setup. Open the **Data** page → *IP Enrichment* tab to see
-the sources, each with its last refresh time and range count.
+without any setup. The sources live under the **Connectors** group in
+the sidebar, split across four enrichment pages — each showing its
+sources with their last refresh time and range count:
 
-The tab is split into two groups:
+- **Cloud Attribution** (`/cloud-attribution`) — AWS, Azure, Google,
+  Oracle Cloud, Cloudflare.
+- **Threat Intelligence** (`/threat-intel`) — FireHOL Level 1, Tor exit
+  nodes, Tor relays.
+- **GeoIP** (`/geoip`) — country-level geolocation from RIR data.
+- **ASN** (`/asn`) — autonomous-system attribution from ip2asn.
 
-- **Cloud providers (informational)** — AWS, Azure, Google.
-- **Threat intelligence** — FireHOL Level 1 (and future feeds).
-
-The master switch at the top of the tab is a **kill-switch**: turn it
-off to stop all outbound enrichment traffic at once (no fetches at
-startup or on the hourly tick). You can also disable a single source
-with its own toggle, or click **Refresh now** to pull a freshly
-published list immediately.
+A single global **IP enrichment** master switch governs all four pages
+and stays in sync between them: it is a **kill-switch** — turn it off to
+stop all outbound enrichment traffic at once (no fetches at startup or on
+the refresh tick). You can also disable a single source with its own
+toggle, or click **Refresh now** to pull a freshly published list
+immediately. See [sources.md](sources.md) for the per-page walkthrough,
+including what each source is good for and its limitations.
 
 ### From the CLI
 
@@ -139,10 +160,10 @@ Available columns:
 | Column       | Type      | Meaning                                                            |
 |--------------|-----------|---------------------------------------------------------------------|
 | `id`         | UUID      | Row identifier.                                                     |
-| `source`     | VARCHAR   | `aws`, `azure`, `google`.                                           |
+| `source`     | VARCHAR   | The feed: `aws`, `azure`, `google`, `google_services`, `oracle`, `cloudflare`, `firehol_level1`, `tor_exit`, `tor_relays`, `geoip`, `asn`. |
 | `cidr`       | INET      | The IP range.                                                       |
-| `nature`     | VARCHAR   | `cloud` or `threat`.                                                |
-| `details`    | VARCHAR   | Provider-specific string (e.g. `S3 / us-east-1`).                   |
+| `nature`     | VARCHAR   | `cloud`, `threat`, `geoip` or `asn`.                                |
+| `details`    | VARCHAR   | Source-specific string (e.g. `S3 / us-east-1`, `FR`, `AS13335 CLOUDFLARENET`). |
 | `fetched_at` | TIMESTAMP | When this row was loaded. Use with `LAST` / `BETWEEN`.              |
 
 ### Typical use: pivot against sessions
@@ -179,10 +200,10 @@ faster on large result sets.
 | Column        | Type      | Meaning                                                |
 |---------------|-----------|--------------------------------------------------------|
 | `ip`          | INET      | The resolved IP. Equi-join against `server_ip` / `ip`. |
-| `source`      | VARCHAR   | `aws`, `firehol_level1`, … (several rows per IP for multiple threat feeds). |
-| `nature`      | VARCHAR   | `cloud` or `threat`.                                   |
+| `source`      | VARCHAR   | `aws`, `firehol_level1`, `geoip`, `asn`, … (several rows per IP — e.g. an IP can be cloud *and* carry a country *and* an AS). |
+| `nature`      | VARCHAR   | `cloud`, `threat`, `geoip` or `asn`.                   |
 | `cidr`        | INET      | Longest matching range the IP fell in.                 |
-| `detail`      | VARCHAR   | Per-source hint (empty for FireHOL).                   |
+| `detail`      | VARCHAR   | Per-source hint (country code for `geoip`, `AS… org` for `asn`; empty for FireHOL). |
 | `resolved_at` | TIMESTAMP | When the IP was classified.                            |
 
 ```nfql
@@ -222,8 +243,12 @@ hits a particular provider.
 
 ## Frequency and data freshness
 
-- The hourly tick keeps every enabled source within an hour of
-  the upstream's latest publication.
+- An **hourly tick** keeps most enabled sources within an hour of the
+  upstream's latest publication.
+- **GeoIP and ASN refresh weekly, not hourly.** Their underlying data
+  (RIR allocations, ip2asn) changes slowly and the files are large, so a
+  weekly cadence is plenty — and it keeps the cost of these two large
+  sources low. *Refresh now* still forces an immediate fetch on demand.
 - Conditional GETs mean a no-op refresh costs ~250 ms and 0 bytes
   of body, so the hourly cadence is cheap.
 - Manual *Refresh now* lets you pull a freshly-published list
@@ -235,6 +260,8 @@ The published lists themselves update at different cadences:
 - **Azure** — weekly, on a rotating filename.
 - **Google** — irregular, typically weekly.
 - **FireHOL Level 1** — continuously, several times a day.
+- **GeoIP (RIR) and ASN (ip2asn)** — slowly; obserae refetches them
+  weekly to match.
 
 obserae tracks these and adapts automatically — no operator action
 needed beyond initial enablement.
@@ -256,7 +283,8 @@ enrichment — IPs simply render as bare addresses.
 
 ## Where to next
 
-- [web-gui.md](web-gui.md#data) — the *Data* page that hosts the
-  enrichment controls.
+- [sources.md](sources.md) — the **Connectors** pages that host the
+  enrichment controls, with what each source is good for and its
+  limitations (GeoIP accuracy, what an ASN is, why flag Tor traffic).
 - [nfql.md](nfql.md#cross-pipeline-lookups) — the `WITHIN` operator
   and PIVOT/JOIN cascade.

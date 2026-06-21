@@ -27,7 +27,8 @@ looking at.
 │   Flow Matrix                Page content                            │
 │ ANALYSIS  ▸│                                                         │
 │ CONNECTORS▸│   (Investigation · Sessions · Rules · Detection)        │
-│ ❒ Audit log│   (Sources · Outputs)                                   │
+│ ❒ Audit log│   (Exporters · Cloud Attribution · Threat Intel ·       │
+│            │    GeoIP · ASN · Outputs)                               │
 │ SETTINGS  ▾│                                                         │
 │   Users · Storage · Retention · Backup · Config I/O                  │
 └────────────┴─────────────────────────────────────────────────────────┘
@@ -36,7 +37,8 @@ looking at.
 The sidebar is an **accordion**: pages are grouped under four
 collapsible themes — **Network** (Cartography, Flow Matrix),
 **Analysis** (Investigation, Sessions, Rules, Detection),
-**Connectors** (Sources, Outputs) and **Settings** (Users, Storage,
+**Connectors** (Exporters, Cloud Attribution, Threat Intelligence,
+GeoIP, ASN, Outputs) and **Settings** (Users, Storage,
 Retention, Backup, Config I/O) — with **Cockpit** and **Audit log** as
 direct top-level links. The group holding the page you are on opens
 automatically; you can expand or collapse any group by clicking its
@@ -131,12 +133,17 @@ What you can do on this page:
   over the last 24h. Click the hexagon to open a dedicated drawer
   with the pool bounds and the live leases (see
   [cartography.md](cartography.md#dhcp-networks)).
-- **Orphan IPs drawer** (toolbar button) lists every IP seen in
-  traffic but not yet declared as an interface. A small switch in
-  the drawer header — **All IPs** / **Declared only** — hides the
-  rows tagged `outside known CIDRs` so you can focus on candidates
-  already covered by one of your networks. The switch state is
-  session-only (does not survive a tab reload).
+- **Network Discovery drawer** (toolbar button) proposes candidate
+  **subnets** detected from non-routable (private) traffic, so you can
+  declare your networks straight from the observed flows. **+ Declare**
+  opens the network form pre-filled with the candidate CIDR.
+- **IP Discovery drawer** (toolbar button, formerly *Orphan IPs*) lists
+  every IP seen in traffic but not yet declared as an interface — the
+  machines to add as hosts. A small switch in the drawer header —
+  **All IPs** / **Declared only** — hides the rows tagged
+  `outside known CIDRs` so you can focus on candidates already covered
+  by one of your networks. The switch state is session-only (does not
+  survive a tab reload).
 - **Right-click a node** for the create / rename / delete actions.
 - **Box-select** several nodes to group them in one click.
 - **Wheel to zoom**, drag the canvas to pan.
@@ -376,38 +383,118 @@ See [outputs.md](outputs.md) for the full reference.
 
 ---
 
-## Sources
+## Connectors
 
-Everything that *produces data* for obserae lives here: the NetFlow
-exporters (the devices that emit flows), the cloud-provider
-attribution sources, and the threat-intelligence feeds. Three tabs.
-See [sources.md](sources.md) for the full walkthrough.
+Everything that *produces data* for obserae lives under the
+**Connectors** group: the Exporters page plus four IP-enrichment
+pages (Cloud Attribution, Threat Intelligence, GeoIP, ASN). See
+[sources.md](sources.md) for the full walkthrough — including what each
+source is good for and its limitations.
 
-### Exporters tab
+### Exporters page
 
-A table with one row per NetFlow-emitting device the daemon has
-seen. The IP is the `sampler_address` carried on every flow; the
-**name**, **equipment type** and **details** columns are yours to
-fill in — once labelled, the rest of the GUI (Sessions, Cartography,
-Investigation) shows the friendly name instead of the raw IP.
+`🖧 Exporters` (`/exporters`) — a table with one row per
+NetFlow-emitting device the daemon has seen. The IP is the
+`sampler_address` carried on every flow; the **name**, **equipment
+type** and **details** columns are yours to fill in — once labelled,
+the rest of the GUI (Sessions, Cartography, Investigation) shows the
+friendly name instead of the raw IP.
 
 The list auto-refreshes from observed traffic every 5 minutes; a
 **Rescan** button forces a sweep on demand if you just added a new
-device.
+device. Each row also has a **🗑 Delete** button to drop a sampler
+you have decommissioned — the rescan only adds new exporters, so
+Delete is how you clear out stale ones.
 
-### Cloud attribution tab
+### Cloud Attribution page
 
-The master toggle for IP enrichment plus the list of cloud-provider
-sources (AWS, Azure, Google). When on, every IP gets a discreet
+`☁ Cloud Attribution` (`/cloud-attribution`) — the master toggle for
+IP enrichment plus the list of cloud-provider sources (AWS, Azure,
+Google, Oracle Cloud, Cloudflare). When on, every IP gets a discreet
 cloud-provider badge across the GUI.
 
-### Threat intelligence tab
+### Threat Intelligence page
 
-Same controls for open-source TI feeds (FireHOL …). Hits surface as
-a red triangle on Sessions and Cartography.
+`🛡 Threat Intelligence` (`/threat-intel`) — the same controls for
+open-source TI feeds (FireHOL Level 1, Tor exit nodes, Tor relays). It
+carries the same global IP enrichment toggle (synced with Cloud
+Attribution). Hits surface as a red triangle on Sessions and
+Cartography. [sources.md](sources.md#threat-intelligence-page) explains
+why flagging Tor traffic matters.
+
+### GeoIP page
+
+`🌐 GeoIP` (`/geoip`) — country-level geolocation built from the public
+regional-internet-registry (RIR) data; no MaxMind account required. When
+on, every public IP gets an ISO country code and Cartography hosts show a
+small **country flag**. Same global toggle as the other enrichment pages,
+but it refreshes **weekly** (RIR data changes slowly). Note the accuracy
+caveats — country only, allocation rather than physical location — in
+[sources.md](sources.md#geoip-page).
+
+### ASN page
+
+`⑂ ASN` (`/asn`) — autonomous-system attribution from the ip2asn dataset:
+which network operator (`AS<n> <org>`) owns each public IP. It catches IPs
+the curated cloud/threat lists miss. Same global toggle; refreshes
+**weekly** and is the heaviest source. See
+[sources.md](sources.md#asn-page) for what an ASN is and when it helps.
 
 The full enrichment mechanism is described in
 [enrichment.md](enrichment.md).
+
+---
+
+## Audit log
+
+> **Enterprise feature — free during the alpha.** The audit log is a
+> planned Enterprise feature, fully usable now at no cost while obserae is
+> in alpha. See [Licensing & transparency](../LICENSING.md).
+
+`❒ Audit log` (`/auditlog`) is the **append-only record of every operator
+action** taken on obserae — across both control planes (the web GUI and
+the `obserae-cli` socket). It answers "who changed what, and when": a rule
+edited, a source disabled, a user created, a backup restored, an alert
+deleted.
+
+```
+WHEN                 ACTOR   PLANE  ACTION                 TARGET
+2026-06-18 09:14:02  admin   web    rule.updated           ssh-from-internet
+2026-06-18 09:02:41  alice   cli    enrichment.disabled    (master switch)
+2026-06-17 23:51:10  admin   web    user.created           bob
+```
+
+What you can do:
+
+- **Filter** by actor, action, target or time window to reconstruct a
+  change history.
+- **Open an entry** to see the full detail recorded for that action.
+- Conserve it for as long as you need — its retention is configured
+  separately on the [Retention](#storage-retention--backup) page, so the
+  trail outlives ordinary flow/session data.
+
+### Tamper-evidence
+
+The journal is **tamper-evident**, not just append-only. Every line is
+chained to the previous one with a SHA-256 hash, and closed files are
+sealed with an HMAC in a separate registry. That means any attempt to
+edit, delete or reorder a past entry breaks the chain and is **detectable
+after the fact** — even by someone with disk access.
+
+You can verify the chain **independently, offline**, without trusting the
+running daemon:
+
+```sh
+# Built into the CLI (offline — reads the files directly, no daemon needed)
+obserae-cli verify-auditlog --dir ./data/auditlog
+
+# Or with the standalone, dependency-free Python verifier
+python3 tools/verify_auditlog.py --dir ./data/auditlog
+```
+
+Both read the raw on-disk bytes and report any break in the chain (exit 0 =
+intact, non-zero = a break was found). This is what lets the audit log
+stand up as evidence rather than a convenience log.
 
 ---
 

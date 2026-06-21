@@ -1,19 +1,25 @@
-# Sources
+# Connectors
 
-The **Sources** page is your central place for everything that
-*produces data* for obserae:
+The **Connectors** menu group gathers everything that *produces
+data* for obserae. Five pages cover the data sources:
 
-- the **NetFlow exporters** — the switches, firewalls, routers
+- **Exporters** (`/exporters`) — the switches, firewalls, routers
   and probes that emit flow records toward the daemon;
-- the **cloud-provider attribution sources** (AWS, Azure, Google);
-- the **threat-intelligence feeds** (FireHOL …).
+- **Cloud Attribution** (`/cloud-attribution`) — the cloud-provider
+  attribution sources (AWS, Azure, Google, Oracle, Cloudflare);
+- **Threat Intelligence** (`/threat-intel`) — the open-source
+  threat-intel feeds (FireHOL …);
+- **GeoIP** (`/geoip`) — country-level geolocation built from the
+  regional internet registry (RIR) data;
+- **ASN** (`/asn`) — autonomous-system attribution (which AS owns an IP)
+  built from the ip2asn dataset.
 
-Open it from the sidebar (`⇅ Sources`) or directly at
-`/sources`. Three tabs.
+Open them from the sidebar under **Connectors**
+(🖧 Exporters · ☁ Cloud Attribution · 🛡 Threat Intelligence · 🌐 GeoIP · ⑂ ASN).
 
 ---
 
-## Exporters tab
+## Exporters page
 
 This is where you give every flow-emitting device a friendly
 name and an equipment type. Once labelled, every other page
@@ -65,22 +71,49 @@ only refreshes the auto-maintained counters.
 > the device has never reached the daemon, there's nothing to
 > label yet. Plug it in, wait for one flow, then rescan.
 
+### Deleting a row
+
+Each row has a **🗑 Delete** button. Use it to drop an exporter
+that no longer belongs in the list — typically a device you have
+**decommissioned or moved** after a network reconfiguration. The
+rescan only *adds* newly-seen samplers; it never removes old ones,
+so Delete is how you clear out the stale entries.
+
+Clicking it opens a confirmation dialog (Cancel / Delete exporter);
+the row is only removed once you confirm.
+
+> **Delete is best-effort.** It removes the row (and its label)
+> right away, but the rescanner re-creates it from observed traffic
+> if that sampler is **still sending flows** — this time without
+> your label. Delete is therefore meant for samplers that have
+> actually stopped emitting; deleting one that is still active just
+> resets its label on the next sweep.
+
 ---
 
-## Cloud attribution tab
+## Cloud Attribution page
 
-This tab annotates every IP the daemon sees with its cloud
-provider when applicable (AWS / Azure / Google Cloud). On
-Sessions and Cartography, a small grey hint then appears under
-the host: e.g. `52.93.x.x` shows up as `AWS · us-east-1 · S3`
-instead of an opaque public IP.
+This page annotates every IP the daemon sees with its cloud
+provider when applicable (AWS / Azure / Google Cloud / Oracle Cloud /
+Cloudflare). On Sessions and Cartography, a small grey hint then
+appears under the host: e.g. `52.93.x.x` shows up as
+`AWS · us-east-1 · S3` instead of an opaque public IP.
 
 ### The master toggle
 
-The **IP enrichment** slider at the top is the kill-switch. When
-off, the daemon stops fetching new CIDR ranges from any source
-and stops resolving IPs at ingest time. Existing annotations stay
-in place until you turn it back on or restart the daemon.
+The **IP enrichment** slider at the top is the global kill-switch.
+When off, the daemon stops fetching new CIDR ranges from any
+source and stops resolving IPs at ingest time. Existing
+annotations stay in place until you turn it back on or restart the
+daemon.
+
+> ⚠ The master toggle (labelled **Global enrichment**) is exactly that —
+> **global**: it governs **every** enrichment source (Cloud Attribution,
+> Threat Intelligence, GeoIP and ASN). The same switch appears on all
+> these pages and stays in sync. Flipping it opens a **confirmation
+> dialog** spelling out that it turns every source on or off at once;
+> use the **per-source** toggles to enable or disable a single source
+> without the dialog.
 
 ### The source list
 
@@ -101,20 +134,203 @@ Each row is one provider. Per-source controls:
 
 ---
 
-## Threat intelligence tab
+## Threat Intelligence page
 
-Same shape as the cloud tab but for open-source threat-intel
-feeds. Hits surface as a red triangle on Sessions and
-Cartography for any IP listed by an enabled feed.
+Same shape as the Cloud Attribution page but for open-source
+threat-intel feeds. It carries the same global **IP enrichment**
+toggle (synced with Cloud Attribution). Hits surface as a red
+triangle on Sessions and Cartography for any IP listed by an
+enabled feed.
 
-The default seed is **FireHOL Level 1** (a curated list of known
-malicious networks). Other feeds can be added by extending the
-daemon's enrichment-sources package — operator interface for
-adding new feeds is on the roadmap.
+Seeded feeds:
+
+- **FireHOL Level 1** — a curated list of known malicious networks
+  (active attackers, bogons, hijacked ranges) that should never appear in
+  legitimate traffic.
+- **Tor exit nodes** — the IPs of Tor **exit** relays (the bulk exit
+  list): the last hop where Tor traffic *leaves* the anonymity network and
+  re-enters the public Internet.
+- **Tor relays** — the IPs of **all** running Tor relays and bridges (from
+  the Tor Project's onionoo service), each tagged with its node nickname —
+  a superset that also covers middle and guard nodes.
+
+Each has its own per-source toggle and Refresh button.
+
+### Why flag Tor traffic?
+
+**Tor** (The Onion Router) is a volunteer-run network that anonymises
+traffic by bouncing it through several relays, hiding the real source.
+That anonymity is legitimate for many users, but for a network operator a
+connection to or from a Tor node is **context worth surfacing** during
+triage:
+
+- **Inbound from a Tor exit node.** Someone is reaching one of your
+  exposed services *through* Tor to hide where they really are — a common
+  pattern for credential-stuffing, scanning and reconnaissance. For most
+  internal services this should simply never happen, so a hit is a strong
+  signal.
+- **Outbound to a Tor node.** An internal host connecting *out* to Tor is
+  often a red flag: malware command-and-control and data exfiltration
+  frequently tunnel over Tor to evade egress filtering. A server that has
+  no business using Tor suddenly doing so deserves a look.
+- **Faster qualification.** When an alert fires, the Tor tag instantly
+  tells you the peer is anonymised, so you stop trying to attribute it by
+  GeoIP/ASN (which only point at the exit node's hosting provider anyway).
+
+When to use which feed: **exit nodes** is the high-signal list for
+*inbound* suspicious traffic (that is the only kind of Tor node a client
+on the Internet connects to your service through). The full **relays**
+list also catches an internal host reaching *into* the Tor network at any
+relay, at the cost of more matches.
+
+Example — sessions where one side is a known Tor node:
+
+```nfql
+FROM enrichment_ips | WHERE source == "tor_exit" | KEEP ip
+> FROM sessions | PIVOT ip == server_ip
+                | LAST 3600
+                | KEEP ip_a, ip_b, server_port, ab_bytes
+```
+
+**Limitations.** The feeds list only nodes that are *currently running*,
+so a relay that just went offline lingers for up to ~30 minutes, and
+private (unpublished) Tor bridges are not listed at all by design. The tag
+means "this IP is a Tor node", not "this traffic is malicious" — it is a
+qualifier for triage, not a verdict.
+
+---
+
+## GeoIP page
+
+Same shape as the other enrichment pages, for **country-level
+geolocation**. The single source builds its database from the five
+regional internet registry (RIR) delegation files — the public,
+license-free record of which IP block was allocated to which country.
+No MaxMind account or API key required.
+
+Once enabled, every **public** IP the daemon sees is tagged with its
+ISO country code. The most visible effect is on **Cartography**: a host
+whose interface IP is internet-routable and found in the GeoIP database
+shows a small **country flag** at its top-right corner. Private/internal
+IPs (RFC1918) are never geolocated and show no flag.
+
+One thing sets GeoIP apart from the other sources:
+
+- **Weekly refresh.** RIR data changes slowly, so the automatic refresh
+  runs once a week (the *Refresh* button still forces an immediate fetch
+  on demand). The same global **IP enrichment** toggle as the other
+  pages governs it.
+
+Like the other sources it is **enabled by default**. GeoIP matches
+almost every public IP, so it writes more enrichment rows than the
+cloud/threat feeds — disable it here if you don't want country tagging.
+
+### What it is good for
+
+A country flag next to a remote IP is the fastest possible context in an
+incident review. Typical uses:
+
+- **Spot the unexpected origin.** A database that normally talks only to
+  local hosts suddenly has a session to a 🇨🇳 / 🇷🇺 address — the flag makes
+  it jump out before you read a single port number.
+- **Compliance & data residency.** Confirm at a glance that traffic for a
+  given service stays inside the regions you expect.
+- **Triage enrichment.** Combine the country with the ASN and threat tags
+  on the same IP to qualify an alert quickly (see the ASN and Threat
+  Intelligence pages).
+
+### Accuracy & limitations
+
+GeoIP is built from **free, public RIR allocation data**, not a commercial
+geolocation product. Understand what that means before you rely on it:
+
+- **Country granularity only.** You get an ISO country code — **no city, no
+  latitude/longitude, no ISP/organisation name**. (Paid databases like
+  MaxMind GeoIP2 offer city-level data; obserae deliberately avoids that
+  licensing dependency.) For *who owns* the IP, use the **ASN** source
+  instead.
+- **It reflects allocation, not physical location.** The country is the one
+  the IP block was *registered/allocated* to at a regional registry — not
+  necessarily where the server physically sits. A cloud or CDN block
+  allocated to a US entity may host machines in Europe, so a flag on an
+  AWS / Cloudflare / Google IP can be misleading. Treat flags on
+  cloud/CDN ranges with caution and cross-check with the cloud attribution
+  tag.
+- **Update latency.** A freshly (re)allocated or transferred block can take
+  **one to two weeks** to appear in the published RIR files, and obserae
+  itself refreshes weekly. GeoIP is not real-time.
+- **Public, announced space only.** Bogons, reserved and unannounced ranges
+  have no entry — those IPs simply show no flag. Private/RFC1918 addresses
+  are never geolocated by design.
+
+In short: GeoIP is excellent for *fast human context* and *anomaly
+spotting*, and unreliable as *forensic ground truth* for cloud/CDN
+endpoints. Pair it with ASN and the cloud sources for a fuller picture.
+
+---
+
+## ASN page
+
+Same shape as the other enrichment pages, for **autonomous-system
+attribution**. The single source builds its table from the
+[ip2asn](https://iptoasn.com) dataset — the public mapping of every
+announced IP range to the AS that owns it.
+
+### What is an ASN?
+
+An **Autonomous System** is a block of IP addresses operated by a single
+organisation under one routing policy — an ISP, a hosting/cloud provider,
+or a large enterprise. Each one has a number, written `AS<n>` (e.g.
+`AS13335` is Cloudflare, `AS16509` is Amazon, `AS15169` is Google). It is
+the unit Internet routing (BGP) works in: when a packet crosses the public
+Internet, it hops from one autonomous system to the next.
+
+For obserae this answers one practical question about any public IP: **who
+owns the network it lives on?** That is often what you actually want to
+know in an investigation — not the exact service, just "is this Amazon,
+some hosting provider in another country, or a residential ISP?".
+
+### Why it is useful
+
+Its job is to **catch what the curated cloud/threat lists miss**. Those
+lists are hand-published and incomplete; ip2asn covers essentially every
+announced IP on the Internet. For example, Cloudflare's published CDN list
+does **not** include the `1.1.1.1` public DNS resolver (`1.1.1.0/24`), so
+that IP would otherwise show up as plain public — but ip2asn knows it
+belongs to `AS13335 CLOUDFLARENET`. Once enabled, every public IP carries
+its AS (number + organisation) in the host drawer, hover tooltip and NFQL.
+
+A useful triage move is to list the autonomous systems your traffic
+actually reaches:
+
+```nfql
+# Which networks do we egress to? (group sessions by owning AS)
+FROM enrichment_ips | WHERE nature == "asn" | KEEP ip, detail
+> FROM sessions | KEEP server_ip, ab_bytes | JOIN ip == server_ip
+```
+
+A brand-new AS appearing in that list is a classic "first seen" signal for
+an alert rule.
+
+### Limitations
+
+- **An AS is not a service.** `AS16509` is *all of Amazon* — EC2, S3, every
+  region at once. ASN tells you the owner, not which product or region (use
+  the **Cloud Attribution** source for that).
+- **No regional breakdown** and the dataset is large, so this is the
+  heaviest source in memory.
+- **Update latency.** A newly announced or reassigned AS can take days to
+  appear; refresh is weekly.
+
+Like GeoIP it is **enabled by default** and **refreshed weekly** (large
+dataset, slow-changing). It is the heaviest source — disable it here if
+you don't need AS attribution. The same global **IP enrichment** toggle
+governs it.
 
 ---
 
 ## Where things live
 
-- **REST endpoints** — `/api/exporters` (list / patch / rescan)
-  and `/api/enrichment/*` (toggles, refresh) back this page.
+- **REST endpoints** — `/api/exporters` (list / patch / delete /
+  rescan) and `/api/enrichment/*` (toggles, refresh) back these
+  pages.

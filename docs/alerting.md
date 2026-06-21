@@ -120,6 +120,45 @@ You can:
 
 The Detection page updates live — a new alert appears without a reload.
 
+### What the statuses mean
+
+The status is your triage state, not the alert's severity — it tracks
+*where you are* in handling it:
+
+- **new** — nobody has looked yet. This is your work queue; filter on
+  `status = new` to see only what still needs attention.
+- **ack** (acknowledged) — *someone is on it.* Acknowledge as soon as you
+  start investigating so a teammate doesn't pick up the same alert. It
+  stays acknowledged while you dig in.
+- **closed** — handled. Either you remediated the issue, or you decided it
+  was a **false positive / expected traffic**. Closing keeps the record
+  (it is not deleted) so the history stays auditable.
+
+Use **Delete** only for noise you never want to see again — a misfired
+test rule, for example. Prefer **Close** for real alerts you have dealt
+with, so the trail survives.
+
+### A worked example
+
+Say `ssh-from-internet` fires with **3** matched rows:
+
+1. **Acknowledge** the alert so it leaves the `new` queue.
+2. **Open it** to see the matching rows — the source IPs that reached SSH
+   from outside.
+3. **Qualify the source with enrichment.** The IP badges tell you a lot at
+   a glance: a 🇫🇷 flag and your office's ASN is probably a known admin on
+   a new IP; a **Tor exit** tag or an unexpected hosting ASN in another
+   country is far more concerning. (See [Connectors](sources.md) for what
+   GeoIP, ASN and the Tor feeds tell you.)
+4. **Decide and record.** Real intrusion attempt → keep it acknowledged,
+   remediate (block the source, rotate keys), then **Close**. Known admin
+   → **Close** as expected, and consider narrowing the rule so it stops
+   firing on that source.
+
+If you wired up an [Output](outputs.md), this same alert was also pushed
+to your webhook / Gotify at the moment it fired — the Detection page is
+where you then track it to resolution.
+
 > **How alerts are stored.** Fired alerts are kept in an append-only log on
 > disk (the same kind of store as the audit log), not in the live database, so
 > alerting never slows down ingestion. Acknowledging, closing or deleting an

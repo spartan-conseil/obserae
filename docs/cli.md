@@ -382,8 +382,9 @@ are also carried in the `exporters:` config-bundle section.
 
 ## `enrichment`
 
-Drive IP enrichment — the master toggle and the per-source feeds (threat-intel
-lists, cloud CIDR ranges) — the CLI image of the Data page's enrichment tab.
+Drive IP enrichment — the master toggle and the per-source feeds (cloud CIDR
+ranges, threat-intel lists, GeoIP, ASN) — the CLI image of the Connectors
+enrichment pages (Cloud Attribution, Threat Intelligence, GeoIP, ASN).
 
 ```sh
 obserae-cli enrichment status [--json]            # master toggle + last change

@@ -6,8 +6,58 @@ dates; binaries and Docker images for each version are on the
 [releases page](https://github.com/spartan-conseil/obserae/releases). This is a
 bird's-eye view, not an exhaustive commit log.
 
-## [Unreleased]
+## [0.21.0] — 2026-06-21
 
+- **Rule sets (rule packs)**: install ready-made, vendor-neutral detection
+  bundles. A rule set adds a **standard vocabulary** to the cartography —
+  `zone`/`environment` on networks, `role` on hosts, `purpose` on services —
+  and ships rules written against it, so the same pack works on any
+  deployment regardless of your naming. These attributes are queryable in
+  NFQL (`zone:dmz`, `role:workstation`, and `port_proto == "purpose:std.dns"`
+  for the port/protocol-based `purpose`). A new **Rule Sets** page installs
+  packs (with a dry-run preview), enables/disables a whole pack, and shows a
+  full impact screen before deletion; packs can depend on one another with
+  version constraints. Pack rules land on the Alerting page as read-only
+  (enable/disable or **Duplicate** to customise). Ships with the
+  **community** pack: ten common detections (cleartext protocols, exposed
+  RDP, DNS hygiene, direct database access, …). Config export records which
+  packs are installed and their enabled-state — never the pack contents.
+
+  > ⚠️ **Database wipe required.** This release changes the DuckDB schema
+  > (new rule-pack tables, plus `zone`/`environment`/`role`/`purpose`
+  > columns on the cartography). Delete the DuckDB database file and let the
+  > daemon recreate it on next start. **Your YAML config (cartography,
+  > rules, alerting, …) is unaffected and re-imports cleanly** — export it
+  > first if needed, then re-import after the wipe.
+
+- **Cartography discovery funnel**: build the map straight from observed
+  traffic in two stages. **Network Discovery** (new) proposes candidate
+  **subnets** clustered from non-routable (private) flows — `/24` per LAN,
+  widening to `/23`–`/16` on contiguous ranges — and **+ Declare**
+  pre-fills the network form. **IP Discovery** (the renamed *Orphan IPs*
+  drawer) then surfaces the individual IPs to add as hosts. Internal /
+  external separation is preserved: Network Discovery is private-only;
+  routable peers stay on `internet4`/`internet6` via IP Discovery.
+
+- **Self-documented cartography**: every host, network and group can now
+  carry its own free-form **Markdown documentation** — runbooks, ownership
+  notes, escalation steps, whatever the entity needs. The drawer renders it
+  as formatted, sanitized HTML with an **Expand** full-screen view and an
+  **Edit** button to update it inline. The documentation lives with the
+  entity in the cartography, so it travels through config export/import
+  (a `documentation` field in the YAML) like the rest of your map.
+
+## [0.20.0] — 2026-06-17
+
+- **Append-only alerts**: alerts are now persisted as an append-only JSONL
+  journal (same model as the audit log); the alerts view is folded
+  event-sourced and has its own retention.
+- **Tamper-evident audit log**: every journal line carries a `seq` + `prev`
+  SHA-256 hash chain, and closed files are anchored by HMAC seals in a separate
+  registry. The format is verifiable from Go, the CLI (`verify-auditlog`) and a
+  standalone Python tool.
+- **Performance**: a series of ingest- and tick-path optimisations (slow-tick
+  and DB-growth fixes) for steadier throughput at high traffic.
 - **Accordion sidebar**: pages are now grouped under collapsible themes —
   **Network**, **Analysis**, **Connectors** and **Settings** — with Cockpit
   and Audit log as direct links. The group for the page you're on opens

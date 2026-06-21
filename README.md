@@ -138,8 +138,9 @@ setup.
 | [Detection Rules](docs/rules.md) | Model allowed connectivity and inspect what matched. |
 | [Alerting](docs/alerting.md) | Turn saved NFQL queries into alerts. |
 | [Outputs](docs/outputs.md) | Send alerts to webhooks or Gotify. |
-| [Sources](docs/sources.md) | Label exporters and manage enrichment sources. |
-| [IP Enrichment](docs/enrichment.md) | Use cloud and threat-intel ranges in queries. |
+| [Connectors](docs/sources.md) | Label exporters, manage cloud/threat-intel/GeoIP/ASN sources — what each one is for and its limits. |
+| [IP Enrichment](docs/enrichment.md) | Use cloud, threat-intel, GeoIP and ASN ranges in queries. |
+| [Audit log](docs/web-gui.md#audit-log) | Track who changed what, and verify the tamper-evident trail. |
 | [Lifecycle](docs/lifecycle.md) | Manage retention, storage and backups. |
 
 ### Production

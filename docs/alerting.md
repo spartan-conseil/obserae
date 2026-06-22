@@ -156,8 +156,9 @@ Say `ssh-from-internet` fires with **3** matched rows:
    firing on that source.
 
 If you wired up an [Output](outputs.md), this same alert was also pushed
-to your webhook / Gotify at the moment it fired — the Detection page is
-where you then track it to resolution.
+to your webhook, Gotify, Slack, Mattermost, Telegram, syslog/SIEM, Splunk,
+Elasticsearch, PagerDuty, Opsgenie or email at the moment it fired — the
+Detection page is where you then track it to resolution.
 
 > **How alerts are stored.** Fired alerts are kept in an append-only log on
 > disk (the same kind of store as the audit log), not in the live database, so

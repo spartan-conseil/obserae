@@ -172,6 +172,36 @@ any node for create / rename / delete actions, or right-click the
 empty canvas to create a new entity. See
 [web-gui.md](web-gui.md#cartography).
 
+#### One editor at a time (edit lock)
+
+To stop two admins from silently overwriting each other's changes, the
+cartography page is **read-only by default**. To make changes you click
+**Edit**: this takes the **edit lease** and turns the badge green
+(*Editing*). Your create / rename / delete / move actions then work
+normally and each is saved as you go. Click **Done** to leave edit mode
+and release the lease — there is nothing to "save", changes persist
+immediately.
+
+While you hold the lease, **everyone else is read-only**: a banner names
+the current editor (*"Cartography is being edited by …"*), the mutation
+controls are disabled, and dragging a node snaps it back. They can still
+pan, zoom, search and inspect everything, and a **Request edit** button
+takes over the moment the lease is free.
+
+**Only one editing session can be open at a time** — including the *same*
+admin in two browser windows. Clicking Edit in a second window is refused
+until the first clicks Done, so it is impossible to reproduce the
+double-edit problem by opening two tabs.
+
+The lease is held while the editing tab stays on the page, released when
+you click Done or leave the page, and — as a safety net — it **expires on
+its own after 90 seconds** if a tab crashes or loses connectivity (the
+banner shows a live countdown). The lock is also enforced on the server,
+so a cartography change from anyone who does not hold the lease is
+rejected even outside the GUI. It is an in-memory lease — restarting the
+daemon clears it. (It guards *interactive* editing; a YAML re-import from
+[Config I/O](configuration.md) is a separate, atomic operation.)
+
 #### Cloning a host
 
 A host's drawer has a **Clone** button — handy for a cluster of

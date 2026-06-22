@@ -6,6 +6,51 @@ dates; binaries and Docker images for each version are on the
 [releases page](https://github.com/spartan-conseil/obserae/releases). This is a
 bird's-eye view, not an exhaustive commit log.
 
+## [0.22.0] — 2026-06-22
+
+- **Cartography edit lock (one editor at a time)**: when several admins are
+  logged in, the cartography no longer lets them silently overwrite each other.
+  The page is **read-only by default**; click **Edit** to take the **edit lease**
+  (an *Editing* badge) and **Done** to release it — changes save as you go.
+  Everyone else is then **read-only** with a banner naming the current editor,
+  disabled controls and a **Request edit** button. **Only one editing session
+  can be open at a time**, including the same admin in two windows: the second
+  window's Edit is refused until the first clicks Done — so you can't reproduce
+  the double-edit problem by opening two tabs. The lease **expires after 90 s**
+  if a tab crashes, and the rule is enforced on the server too (a carto change
+  from a non-holder is refused). No database change.
+
+- **Docker data-volume permissions**: the images now create
+  `/var/lib/obserae/data` and `chown` the whole `/var/lib/obserae` tree to the
+  non-root user (UID 65532) at build time, so the daemon can write its database,
+  parquet store and cache out of the box — no manual `chown` on the host bind
+  mount before the first start.
+
+- **Alert outputs — eleven new destinations**: alerts can now be delivered far
+  beyond webhook/Gotify. **Messaging**: Slack, Mattermost and Telegram (bot
+  token + API). **SIEM**: Syslog (RFC5424 over UDP/TCP/TLS, as JSON, **CEF** for
+  ArcSight or **LEEF** for QRadar), Splunk HEC, and Elasticsearch/OpenSearch
+  (basic or API-key auth). **Incident**: PagerDuty (Events API v2) and Opsgenie
+  (US/EU), both de-duplicating on the rule name. **Email**: SMTP with
+  STARTTLS / implicit TLS and optional auth. Every type rides the existing
+  reliable outbox (retry with backoff, delivery audit) and the SSRF egress
+  guard — now extended to the raw syslog/SMTP connections too — with secrets
+  redacted on read as before. New destinations are picked from the type
+  dropdown on the **Outputs** page; **Send test** works for each.
+
+- **Richer alert payloads**: deliveries now also carry the rule's **tags**, a
+  threshold rule's **observed value**, and a group-by rule's **key** — included
+  only when the rule produced them. They flow into the webhook JSON, Splunk
+  events, Elasticsearch documents, syslog JSON, and PagerDuty/Opsgenie details,
+  and map to native fields where it helps (Opsgenie **tags**; CEF/LEEF carry the
+  observed value and tag list). Message templates expose `{{.RuleTags}}`,
+  `{{.ObservedValue}}` and `{{.KeyJSON}}`.
+
+  > ⚠️ **Database wipe required.** This release adds columns to the output
+  > delivery outbox (DuckDB schema change). Delete the DuckDB database file and
+  > let the daemon recreate it on next start. **Your YAML config (cartography,
+  > rules, alerting, outputs, …) is unaffected and re-imports cleanly.**
+
 ## [0.21.0] — 2026-06-21
 
 - **Rule sets (rule packs)**: install ready-made, vendor-neutral detection

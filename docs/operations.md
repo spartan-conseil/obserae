@@ -310,7 +310,7 @@ find /var/lib/obserae/parquet -name '*.parquet' -mmin +1 -print | wc -l
 
 ## Backups
 
-Two things to back up:
+Three things to back up:
 
 1. **The DuckDB file** at `storage.duckdb_path`. It carries
    `flows`, `sessions`, `session_matches`, the cartography, the
@@ -319,7 +319,16 @@ Two things to back up:
    the daemon is idle is safe. For maximum safety, stop the daemon,
    copy, restart.
 
-2. **Your authored content** — the whole configuration in one bundle:
+2. **The secrets master key** at `<data_dir>/secrets.key`
+   (configurable via `secrets.master_key_file`, generated mode `0400`
+   on first boot) encrypts the sensitive columns *inside* that DuckDB
+   file — alert-output credentials and the session-signing key. Back
+   it up **offline, separately from the database**: a DB copy without
+   the key is useless for those secrets, and **losing the key makes
+   encrypted output credentials unrecoverable and logs every user
+   out** (a fresh key is generated and all sessions become invalid).
+
+3. **Your authored content** — the whole configuration in one bundle:
 
    ```sh
    obserae-cli config export > /var/backups/obserae/$(date +%F).config.yml

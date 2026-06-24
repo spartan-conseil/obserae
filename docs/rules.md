@@ -212,6 +212,12 @@ The **Rules** page offers create / edit / enable-disable / delete
 actions with chip pickers for `src`, `dst` and `tags`. See
 [web-gui.md](web-gui.md#rules).
 
+To scope a rule to a single interface of a host, type the host name in
+the `src`/`dst` entity field: the autocomplete offers interface-qualified
+refs such as `host:web-01:eth0` and `host:web-01:eth1` alongside the bare
+`host:web-01`. Pick one and the rule targets just that NIC's IP. (There is
+no separate interface field — the qualifier lives in the entity ref.)
+
 ---
 
 ## Searching rules

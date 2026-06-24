@@ -189,6 +189,10 @@ The daemon prints `INFO control api listening` and
 For a long-running install, see
 [operations.md](operations.md) for the systemd unit.
 
+> **Verify before you run.** The release is keyless-signed and ships an SBOM and
+> provenance attestation. To check the tarball's integrity, signature and origin,
+> see **[Verify a Release](verify.md)**.
+
 ---
 
 ## After installing — send flows to obserae

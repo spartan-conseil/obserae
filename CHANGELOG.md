@@ -6,7 +6,78 @@ dates; binaries and Docker images for each version are on the
 [releases page](https://github.com/spartan-conseil/obserae/releases). This is a
 bird's-eye view, not an exhaustive commit log.
 
+## [0.23.0] - 2026-06-24
+
+- **Signed releases with SBOM and provenance**: every release now ships keyless
+  (Sigstore/cosign) signatures, a per-archive SBOM, and a SLSA build-provenance
+  attestation for both the tarballs and the Docker images. Because obserae is
+  closed-source, these artifacts let you prove a download's integrity,
+  authenticity and origin before running it. No key to manage — verification uses
+  the public Rekor transparency log. See the new
+  [Verify a Release](docs/verify.md) guide.
+  
+- **Secrets encrypted at rest**: alert-output credentials (Slack/Telegram/SMTP/
+  webhook tokens, Splunk/PagerDuty/Elasticsearch keys) and the session-signing
+  key are no longer stored in clear text in the database. On first boot the
+  daemon generates a 32-byte master key (`<data_dir>/secrets.key`, mode `0400`,
+  configurable via `secrets.master_key_file`) and seals those columns with
+  AES-256-GCM. Existing clear-text values are migrated automatically at the next
+  startup. **Back up `secrets.key` offline alongside the database** — losing it
+  makes encrypted credentials unrecoverable and invalidates all sessions.
+  Password and API-token hashes are unchanged (already one-way).
+
+- **Rule Sets — per-rule disable now survives config import**: disabling an
+  individual rule inside a pack used to be lost the moment you imported any
+  config bundle that also carried an *Alerting* section — the export right after
+  showed every rule re-enabled. The alerting import now leaves pack-owned rules
+  untouched (it only ever owned your own queries and rules), so a per-rule
+  enable/disable choice round-trips through export/import and persists across
+  later imports of other sections. Rebuild the database after upgrading.
+
+- **Rule Sets — packs auto-install on config import**: a `rule_sets` section that
+  references the bundled **community** pack now installs it automatically during
+  config import, so restoring a configuration no longer requires installing the
+  pack by hand first. Operator-uploaded packs that are not present still warn
+  ("upload it first") because their content is not part of the config bundle.
+
+- **Community pack — four new vendor-neutral detections** (`std.community` 0.2.0):
+  *iot-to-remote-admin* (an IoT device opening SSH/RDP/WinRM/VNC/Telnet sessions —
+  lateral movement), *dns-tunneling-volume* (high-volume DNS to one Internet
+  destination — tunnelling/exfiltration), *ssh-bruteforce-or-scan* (a burst of SSH
+  sessions against one host — brute-force/scan), and *iot-internet-connection-burst*
+  (an IoT device fanning out to many Internet destinations — beaconing/C2). All
+  thresholds are tunable.
+
+- **Cartography read-only is now truly read-only**: when the map is read-only
+  (you haven't taken the edit lease, or another admin holds it), dragging a node
+  no longer moves it on screen and the **Edit** buttons on documentation are
+  hidden. Previously a node would shift during the drag and only snap back after
+  a round-trip, and the documentation editor could be opened (the save was
+  refused by the server, but only after the fact). Both actions are now gated up
+  front. No database change.
+
 ## [0.22.0] — 2026-06-22
+
+- **Flow Matrix — clearer interface/service mismatch error**: scoping a rule to
+  an interface that doesn't carry the chosen service used to fail with a vague
+  "service resolves to no interface". The live preview now names the interface
+  and where the service actually binds — e.g. *service "https" is not bound to
+  interface "eth1" (bound on eth0)* — so the fix is obvious without saving.
+
+- **Flow Matrix — interface qualifier in the entity picker**: scoping a rule to
+  one NIC of a multi-homed host is now a single, discoverable action. The
+  separate **Interface** field is gone; instead the src/dst entity picker
+  suggests interface-qualified refs (`host:web-01:eth0`, `host:web-01:eth1`…) as
+  you type a host name — pick one and the rule targets just that interface's IP.
+  Rules saved with the older two-field shape still open and edit correctly. No
+  database change.
+
+- **Interface-scoped queries are now discoverable**: the engine has always
+  resolved `"host:NAME:IFACE"` (e.g. `"host:dns:eth0"`) to a single interface's
+  IP, but nothing surfaced the syntax. The Investigation page's schema sidebar
+  now has an **Interfaces** section listing every host's named interfaces —
+  click one to drop the `"host:NAME:IFACE"` token at the caret and scope a query
+  to one NIC of a multi-homed host. No database change.
 
 - **Cartography edit lock (one editor at a time)**: when several admins are
   logged in, the cartography no longer lets them silently overwrite each other.

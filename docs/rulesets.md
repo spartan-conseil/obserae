@@ -132,9 +132,20 @@ pack still needs.
 When you export your configuration, obserae records **which** rule sets are
 installed and **which of their rules are enabled** — but not the pack
 contents themselves. On restore, those enable/disable choices are
-re-applied to the packs you have installed; if a referenced pack isn't
-installed yet, you simply get a reminder to upload it. Older configuration
-files (from before rule sets existed) still import without any changes.
+re-applied — and they now **persist**: a per-rule disable used to be lost
+whenever you imported a configuration that also carried alerting rules, but
+that no longer happens.
+
+If a referenced pack isn't installed yet:
+
+- the bundled **community** pack is **installed automatically** during the
+  import, so restoring a configuration no longer means installing it by hand
+  first;
+- a pack you uploaded yourself is not in the config bundle, so you still get a
+  reminder to upload its file.
+
+Older configuration files (from before rule sets existed) still import without
+any changes.
 
 ## Writing your own rule set
 

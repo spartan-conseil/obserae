@@ -121,6 +121,7 @@ setup.
 | Page | Start here when you want to... |
 |------|--------------------------------|
 | [Installation](docs/installation.md) | Install with Docker or binaries and get the daemon running. |
+| [Verify a Release](docs/verify.md) | Check the signature, SBOM and provenance of a download before running it. |
 | [Configuring Exporters](docs/exporters.md) | Configure routers, firewalls and host probes to send NetFlow/IPFIX to obserae. |
 | [Quickstart](docs/quickstart.md) | Build a tiny cartography, add rules, send traffic and run the first queries. |
 | [Configuration](docs/configuration.md) | Understand every YAML key and the practical tuning recipes. |
@@ -179,6 +180,10 @@ What that means in practice — and what the bundled EULA commits to in writing:
   working — there is no license check to fail and nothing to phone home to.
 - **Versioned, never retroactive.** The terms that ship with your version are
   yours to keep — any future change applies only to future versions.
+- **Verifiable, even though it's closed-source.** Every release is keyless-signed
+  (Sigstore/cosign) and ships an SBOM and a SLSA build-provenance attestation, so
+  you can prove the integrity, authenticity and origin of each binary and image
+  before running it — see **[Verify a Release](docs/verify.md)**.
 
 A few features — **user management & RBAC**, the **audit log**, **connectors to
 major commercial platforms** (e.g. a SIEM such as QRadar) and **premium

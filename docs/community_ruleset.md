@@ -2,7 +2,7 @@
 
 ## What it is, in one minute
 
-`std.community` is a **ready-to-use bundle of 68 alerts** that watch your
+`std.community` is a **ready-to-use bundle of 72 alerts** that watch your
 network traffic and warn you when something looks risky, misconfigured or
 suspicious — passwords sent in clear text, a remote-control service left
 open to the Internet, a guest laptop reaching a database, a machine
@@ -23,12 +23,12 @@ It ships:
 | **Environments** (production, test, …) | 8 |
 | Host **roles** (workstation, database server, bastion, …) | 30 |
 | Service **purposes** (dns, https, rdp, ssh, postgres, …) | 134 |
-| Detection **rules** | 68 |
+| Detection **rules** | 72 |
 
 ## How to use it (three steps)
 
 1. **Install the pack.** Rule Sets → install `std.community`. This adds the
-   vocabulary above and the 68 rules (they arrive read-only and you choose
+   vocabulary above and the 72 rules (they arrive read-only and you choose
    which to enable).
 
 2. **Label your network.** In the cartography, tag your entities with the
@@ -48,11 +48,11 @@ cloud lists) so the rules that rely on them can fire — see *Prerequisites*.
 
 ## How the pack decides what to alert on
 
-There are two simple ideas behind the 68 rules.
+There are two simple ideas behind the 72 rules.
 
 ### 1. "You didn't say this was allowed" (most rules)
 
-62 of the 68 rules are **policy rules**. They look only at connections that
+63 of the 72 rules are **policy rules**. They look only at connections that
 are **not already covered by your Flow Matrix** (the list of flows you've
 declared as legitimate). The logic is:
 
@@ -73,7 +73,7 @@ looks like.
 
 ### 2. "This pattern is suspicious by itself" (a few rules)
 
-6 rules are **behavioral**: they look for suspicious *shapes* of traffic
+9 rules are **behavioral**: they look for suspicious *shapes* of traffic
 regardless of whether the connection was declared — because the signal is
 the behavior, not the permission. Examples: a machine that contacts dozens
 of others on the same port (a scan), or a server pushing gigabytes out to
@@ -82,7 +82,7 @@ tuned to your environment (`tuning-required`).
 
 ## What it actually detects
 
-The 68 rules fall into a handful of plain-language families.
+The 72 rules fall into a handful of plain-language families.
 
 ### Clear-text and legacy protocols (credentials exposed)
 
@@ -103,8 +103,10 @@ Engine/Swarm** (container control planes); **OT/industrial services**.
 
 Connections that cross trust boundaries you'd normally keep separate.
 Examples: **guest → database / admin / SMB / directory**, **user → remote
-admin**, **dev or test → production database**, **IoT → directory or
-database**, **management-plane access from outside the management zone**.
+admin**, **IoT → remote admin** (a device opening SSH/RDP/WinRM/VNC/Telnet
+sessions — a strong lateral-movement signal), **dev or test → production
+database**, **IoT → directory or database**, **management-plane access from
+outside the management zone**.
 
 ### Egress hygiene (traffic leaving in the wrong way)
 
@@ -120,7 +122,10 @@ Patterns that look like reconnaissance or exfiltration.
 Examples: **horizontal scan** (one source, many targets, same port),
 **vertical scan** (one source, many ports, one target), **admin fan-out**
 (one source administering an unusual number of systems), **very large
-uploads** to a single Internet destination.
+uploads** to a single Internet destination, **SSH brute-force/scan** (a burst
+of SSH sessions against one host), **DNS by volume** (high-volume DNS to a
+single Internet destination — possible tunnelling), and an **IoT device
+fanning out to many Internet destinations** (possible beaconing or C2).
 
 ### Known-bad addresses and Tor (threat intelligence)
 

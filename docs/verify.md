@@ -24,8 +24,7 @@ organisation — that's why the commands below match on
 | Tool | Used for | Install |
 |------|----------|---------|
 | `sha256sum` | checksum verification | preinstalled on Linux |
-| `cosign` | signature verification | <https://docs.sigstore.dev/system_config/installation/> |
-| `gh` (GitHub CLI) | provenance verification | <https://cli.github.com/> |
+| `cosign` | signature **and** provenance verification | <https://docs.sigstore.dev/system_config/installation/> |
 
 ---
 
@@ -58,20 +57,27 @@ cosign verify-blob checksums.txt \
 `Verified OK` confirms the checksums were signed by obserae's release pipeline.
 Combined with step 1, your tarball is authentic.
 
-## 3. Provenance — how the tarball was built
+## 3. Provenance — how the release was built
 
-The release also carries a provenance bundle, `provenance.intoto.jsonl`, attached
-as a release asset. It records the source commit and the workflow that produced the
-tarballs. Download it next to the tarball and verify offline:
+The release carries a keyless **SLSA build-provenance** attestation,
+`provenance.intoto.jsonl`, attached as a release asset. It records the source
+commit and the workflow that produced the release. The attestation is over
+`checksums.txt` — so it transitively covers every tarball that file lists (verify
+the tarball with steps 1–2 first, then the provenance of `checksums.txt`).
+
+Download `checksums.txt` and `provenance.intoto.jsonl` from the release, then:
 
 ```sh
-gh attestation verify obserae_linux_amd64.tar.gz \
+cosign verify-blob-attestation checksums.txt \
   --bundle provenance.intoto.jsonl \
-  --owner spartan-conseil
+  --type slsaprovenance1 \
+  --certificate-identity-regexp "https://github.com/spartan-conseil/.*" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
 ```
 
-> The `--bundle` form verifies against the downloaded file, so it works even
-> though obserae is built from a private repository.
+> The `--bundle` form verifies entirely against the downloaded files (cert +
+> signature + predicate are in the bundle), so it works even though obserae is
+> built from a private repository — no GitHub or registry lookup needed.
 
 ## 4. SBOM — what's inside
 
@@ -101,9 +107,11 @@ cosign verify ghcr.io/spartan-conseil/obserae:<version> \
   --certificate-identity-regexp "https://github.com/spartan-conseil/.*" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
 
-# Provenance (stored next to the image in ghcr)
-gh attestation verify oci://ghcr.io/spartan-conseil/obserae:<version> \
-  --owner spartan-conseil
+# Provenance (attestation stored next to the image in ghcr)
+cosign verify-attestation ghcr.io/spartan-conseil/obserae:<version> \
+  --type slsaprovenance1 \
+  --certificate-identity-regexp "https://github.com/spartan-conseil/.*" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
 ```
 
 ---

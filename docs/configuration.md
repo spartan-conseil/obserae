@@ -78,10 +78,11 @@ storage:
   # the NFQL query handler. Increase if heavy queries slow the GUI.
   reader_conns: 4
 
-  # Cap DuckDB's memory (MB). 0 = its default of ≈80% of RAM. The key
-  # knob for bounding memory on a small host — see operations.md
-  # "Memory usage keeps climbing". Pair with retention.
-  memory_limit_mb: 0
+  # Cap DuckDB's memory: a size ("512MB", "4GB"), a percentage of RAM
+  # ("50%"), a bare number (= MB), or "0"/"" for its default of ≈80% of
+  # RAM. The key knob for bounding memory on a small host — see
+  # operations.md "Memory usage keeps climbing". Pair with retention.
+  memory_limit: "50%"
   max_threads: 0      # DuckDB worker threads; 0 = one per core
 
 control:
@@ -116,6 +117,13 @@ web:
   # localhost is exempt). With false, login works over HTTP but the cookie
   # travels unprotected — trusted networks only.
   # secure_cookies: false
+
+  # Trusted reverse proxies. Their X-Forwarded-For / X-Real-IP headers are
+  # honoured for the audit log's source IP ONLY when the immediate peer is in
+  # this list; otherwise the headers are ignored so a direct client cannot
+  # forge its IP. Leave empty when reached directly; set to your proxy's
+  # address(es) when fronted by one (CIDRs or bare IPs).
+  # trusted_proxies: ["127.0.0.1", "10.0.0.0/8"]
 
 matcher:
   # Cadence of the rule-matcher engine. Each tick is a single
@@ -285,7 +293,7 @@ The daemon refuses to start if any of these fails:
 - `buffer.max_records` or `buffer.max_age` ≤ 0.
 - `storage.data_dir` is empty.
 - `storage.duckdb_path` is empty.
-- `storage.memory_limit_mb` or `storage.max_threads` < 0.
+- `storage.memory_limit` is malformed, or `storage.max_threads` < 0.
 - `control.socket` is empty.
 - `matcher.interval` ≤ 0.
 - `sessions.interval`, `sessions.grace`, `sessions.hard_timeout` ≤ 0.

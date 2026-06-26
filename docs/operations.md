@@ -448,7 +448,7 @@ keeps growing until it's using most of the memory. Cap it:
 
 ```yaml
 storage:
-  memory_limit_mb: 512   # hard ceiling for DuckDB's cache (MB)
+  memory_limit: "512MB"  # hard ceiling for DuckDB's cache (or "50%" of RAM)
   max_threads: 2         # fewer workers = smaller, steadier memory
 ```
 

@@ -6,6 +6,103 @@ dates; binaries and Docker images for each version are on the
 [releases page](https://github.com/spartan-conseil/obserae/releases). This is a
 bird's-eye view, not an exhaustive commit log.
 
+## [0.24.0] — 2026-06-26
+
+- **No more silent session loss under storage pressure** (fix): when the disk or
+  parquet writer fell behind, the sessionizer could mark a batch as flushed while
+  only part of it had actually been written, losing the rest without a trace — and
+  the final batch at shutdown could vanish entirely. Flushing now blocks until the
+  writer catches up (rather than dropping records on a timeout), the shutdown drain
+  reliably persists the last batch, and the rare residual loss (a genuinely wedged
+  disk) is **counted and surfaced** in the cockpit as a "Session data loss" banner
+  instead of being invisible.
+
+- **Human-readable memory limit** (config, **breaking**): `storage.memory_limit_mb`
+  is renamed to `storage.memory_limit` and now accepts a size (`512MB`, `4GB`), a
+  percentage of physical RAM (`50%`), a bare number (= MB), or `0`/`""` for DuckDB's
+  default. The shipped configs default to `50%`. Percentages are resolved against
+  physical RAM at boot (DuckDB has no `%` unit). **Action required:** rename the key
+  in your config — the old `memory_limit_mb` is no longer read and would be silently
+  ignored, reverting the cap to DuckDB's ≈80%-of-RAM default.
+
+- **Cockpit stays fast on long-running instances** (perf): the live cockpit health
+  panel refreshes every 2 seconds, and several of its counters look at the rule
+  matches. Those lookups used to scan the entire match history on every refresh,
+  so on an instance left running for a day or two the CPU climbed and memory grew
+  without bound. They now only read the recent time window (the same partition
+  pruning already used elsewhere), keeping the cost flat regardless of uptime.
+
+- **Automatic data migration on upgrade** (OBS-MIG): obserae no longer loses your
+  data when the schema changes between versions. The whole data directory
+  (DuckDB + parquet stores + JSONL journals) now carries a single version stamp
+  (`DATA_VERSION`), and deploying a newer build converts the previous version's
+  data to the new format automatically at startup — across all three storage
+  formats, not just SQL. The conversion is gated by a selective on-disk backup
+  (`migration_backup/`, only the data a given migration actually rewrites, never
+  your keys) with a disk-space pre-check that refuses loudly rather than running
+  out of room half-way, and a crash marker that stops the daemon booting on a
+  half-finished migration. Additive changes (a new column/field) cost no copy at
+  all. `obserae-cli status` shows the current data version; `obserae migrate
+  status` and `obserae migrate restore` inspect and roll back from the command
+  line. See [Data migrations](docs/migrations.md).
+
+- **Interactive query path extracted to a testable service** (OBS-AUD-012): the
+  NFQL execution logic behind the Investigation page (snapshot lock, as-of
+  anchoring, bounded scan, truncation) moved out of the HTTP handler into a pure
+  `query/interactive` service, unit-tested without an HTTP stack. No behaviour
+  change — a refactor that makes the security-sensitive query path easier to
+  review and verify.
+
+- **CLI actions record the OS user** (OBS-AUD-011): on Linux, admin actions made
+  through the control socket now carry the connecting process's UID/GID (read via
+  SO_PEERCRED) in the audit log, giving a finer trail than the single "cli"
+  principal on a multi-admin host. Other events are unchanged.
+
+- **Interrupted restores are detected at boot** (OBS-AUD-009): a restore writes
+  a marker before swapping the database and its on-disk stores, and removes it
+  only once both are in place. If the daemon dies mid-swap, the next start
+  refuses to boot with an actionable message instead of silently running on a
+  possibly inconsistent database/stores pair — re-run the restore or clear the
+  marker after verifying.
+
+- **CSRF protection on GUI mutations** (OBS-AUD-005): every state-changing
+  request made with the session cookie now requires a double-submit token (an
+  `obserae_csrf` cookie echoed in the `X-CSRF-Token` header or a `csrf_token`
+  form field). The GUI wires this automatically for HTMX, island `fetch`, and
+  native forms; API-token (Bearer) clients are unaffected. A forged cross-site
+  POST can no longer trigger config import, backup, output or user changes.
+
+- **Interactive NFQL queries bounded at the engine** (OBS-AUD-007): a broad
+  query typed in the Investigation page without a `LIMIT` is now capped at the
+  SQL level (DuckDB stops scanning at the display cap) instead of loading the
+  whole result set into memory before truncating. Programmatic queries
+  (detection engines, CLI) and queries with an explicit `LIMIT` are unaffected.
+
+- **Write-lock contention is now observable** (OBS-AUD-008): when a bulk writer
+  (enrichment refresh, config import) has to wait on long-running NFQL reads to
+  finish, that wait is counted and — past the DB-wait threshold — logged as a
+  warning, instead of being silent. Helps explain a sporadically slow admin
+  action under heavy query load.
+
+- **XSS defence pinned by tests** (OBS-AUD-006): the strict Content-Security-Policy
+  keeps `'unsafe-eval'` (required by Alpine.js), so server-side `html/template`
+  auto-escaping is the primary defence. A new test stores a `<script>` payload in
+  an operator-controlled field and proves the rendered HTML escapes it, alongside
+  the existing test that forbids `'unsafe-inline'` on `script-src`. The remaining
+  `'unsafe-eval'` is documented as accepted tech debt.
+
+- **Docs reflect the real auth posture** (OBS-AUD-010): stale comments and docs
+  that wrongly implied the GUI was unauthenticated / assumed a single operator
+  are corrected — the GUI requires a login backed by users, groups, RBAC and
+  API tokens. A guard test fails the build if such a claim reappears.
+
+- **Audit source IP no longer spoofable** (OBS-AUD-004): the `X-Forwarded-For` /
+  `X-Real-IP` headers are now honoured for the audit log's source IP only when
+  the request's immediate peer is a configured trusted proxy (`web.trusted_proxies`,
+  CIDRs or bare IPs). A direct client can no longer forge its IP in the journal.
+  The real client is taken as the rightmost non-proxy hop, so a spoofed leftmost
+  value is ignored. Default is to trust no proxy header.
+
 ## [0.23.0] - 2026-06-24
 
 - **Signed releases with SBOM and provenance**: every release now ships keyless

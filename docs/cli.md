@@ -50,6 +50,7 @@ so a typo never fails silently.
 |-----------------|-----------------------------------------------------------------|
 | `status`        | Daemon liveness + per-table counts                              |
 | `config`        | Bulk import / export / validate the WHOLE configuration (one YAML bundle) |
+| `masterkey`     | Export / rotate the at-rest master key (base64)                  |
 | `network`       | CRUD on networks                                                |
 | `host`          | CRUD on hosts                                                   |
 | `interface`     | CRUD on host interfaces (always `--host`-scoped)                |
@@ -150,6 +151,27 @@ is validated fully before any write, then applied in dependency order
 > keys) — keep it safe. The old per-domain bulk commands (`cartography`,
 > `rules` import/export) were folded into this one; per-entity commands
 > below remain.
+
+---
+
+## `masterkey`
+
+Export or rotate the single at-rest **master key** (`masterkey.bin`). One key
+protects every stored secret (alert credentials, device API secrets, session
+keys) and the audit-seal authenticity — everything is HKDF-derived from it.
+
+```sh
+obserae-cli masterkey export [--output FILE]   # print the key as base64
+obserae-cli masterkey import FILE              # rotate to a base64 key (- for stdin)
+```
+
+Export it to your secret manager. `import` **rotates** the key: every secret is
+re-encrypted and every audit seal re-signed under the new key, **live — no
+restart**. (GUI equivalent: *Config I/O → Master key*.)
+
+> Treat the exported key like a root credential. To restore onto a rebuilt
+> instance instead, place the backed-up `masterkey.bin` (mode `0400`) in the data
+> directory before the first boot.
 
 ---
 

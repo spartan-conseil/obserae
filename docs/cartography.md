@@ -257,6 +257,11 @@ suggested name — review the name (you can change anything), then submit.
 The new network appears on the map and the candidate drops off the list.
 Subnets you have already declared are never proposed again.
 
+If you have registered an OPNsense firewall on the
+[Devices](sources.md#devices-page) page, its **interface CIDRs** are also
+proposed here as candidate subnets — ground truth straight from the
+firewall, not just inferred from traffic.
+
 **IP Discovery** (stage 2, formerly *Orphan IPs*) lists every individual
 IP seen in traffic over the last 24 hours that has no interface yet —
 the machines to add as hosts. A switch in the drawer header — **All
@@ -266,6 +271,11 @@ networks (the easiest to adopt). Each row offers **+ Add** (create a new
 `?<ip>` host with its inferred services) or **⇢ Merge** (attach the IP as
 a new interface on an existing host). The filter is session-only:
 leaving the page resets it to "All IPs".
+
+If an OPNsense firewall ([Devices](sources.md#devices-page)) has reported
+an IP in its **ARP table**, that IP is listed **first** and carries an
+`arp` tag together with the MAC address and hostname the firewall saw —
+the authoritative identity for a machine you have not declared yet.
 
 Typical flow: open **Network Discovery**, declare the subnets it finds,
 then open **IP Discovery** — the IPs inside those new networks are now
@@ -375,6 +385,10 @@ Once a network has a DHCP range:
   row and lease list, so either path works. The hexagon is purely a
   view of the network: it has no Edit / Delete actions of its own —
   the range itself is edited via the parent network's form.
+  When an OPNsense firewall ([Devices](sources.md#devices-page)) is
+  registered, each lease in the drawer also shows the firewall-reported
+  **hostname, MAC and manufacturer**, tagged by source (NetFlow,
+  OPNsense, or both) so you can see which leases the firewall confirms.
 
 You can also **query** the two halves of the network by name —
 `office.dhcp` (the pool) and `office.static` (everything else) — in

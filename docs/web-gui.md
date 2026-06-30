@@ -30,7 +30,7 @@ looking at.
 │ ❒ Audit log│   (Exporters · Cloud Attribution · Threat Intel ·       │
 │            │    GeoIP · ASN · Outputs)                               │
 │ SETTINGS  ▾│                                                         │
-│   Users · Storage · Retention · Backup · Config I/O                  │
+│   Monitoring · Users · Storage · Retention · Backup · Config I/O     │
 └────────────┴─────────────────────────────────────────────────────────┘
 ```
 
@@ -38,7 +38,7 @@ The sidebar is an **accordion**: pages are grouped under four
 collapsible themes — **Network** (Cartography, Flow Matrix),
 **Analysis** (Investigation, Sessions, Rules, Detection),
 **Connectors** (Exporters, Cloud Attribution, Threat Intelligence,
-GeoIP, ASN, Outputs) and **Settings** (Users, Storage,
+GeoIP, ASN, Outputs) and **Settings** (Monitoring, Users, Storage,
 Retention, Backup, Config I/O) — with **Cockpit** and **Audit log** as
 direct top-level links. The group holding the page you are on opens
 automatically; you can expand or collapse any group by clicking its
@@ -50,7 +50,10 @@ daemon (green = up, red = unreachable) and the current ingest rate
 (flows per second), pushed in real time over a WebSocket. When the
 in-memory session map comes under pressure, a **pressure badge**
 appears here too (amber, then red) — so a "too many open sessions"
-condition is visible from any page, not just the cockpit.
+condition is visible from any page, not just the cockpit. A separate
+**warning icon** appears when there is a database or ingestion problem
+(writer contention or matcher backlog) and links to the
+[Monitoring](monitoring.md) page.
 
 The **command palette** (`Ctrl+K`) jumps to any page or searches
 across cartography entities and rules.
@@ -62,7 +65,7 @@ across cartography entities and rules.
 The landing page. Designed so an analyst opening obserae in the
 morning knows within 5 seconds whether anything is wrong.
 
-Six zones:
+Five zones:
 
 1. **Health strip** — five live counters: flows/s, active sessions,
    half-open sessions, closed sessions, total NetFlow records since
@@ -91,20 +94,37 @@ Six zones:
    - **Enrichment LRU** — how full the insert-time enrichment
      resolver's cache is. A full cache only costs re-resolutions,
      not correctness.
-6. **DB activity** — a live "ps for the database". obserae writes
-   through a **single** database connection, so when ingestion slows
-   the question is always "what is holding that connection?". This pane
-   lists the operations in flight (longest first; the running write is
-   flagged `RUNNING`). The header shows `in-use`, a live **wait Δ** (how
-   long the writer spent queued during the last interval — it falls back
-   to zero when there's no contention) and, muted, the cumulative
-   "total since start" counters. A **Writer contention** banner appears
-   only when that per-interval wait crosses the threshold — *not* when
-   the cumulative total is high (that counter only ever grows and is not
-   an alarm). It's the GUI twin of `obserae-cli ps` (see
-   [cli.md](cli.md#ps)); reach for it the moment flows/s drops.
 
-The Cockpit is the right place to start every shift.
+The Cockpit is the right place to start every shift. The database and
+ingestion internals (DB activity, writer pool, parquet throughput, memory)
+live on the [Monitoring](monitoring.md) page instead — the Cockpit stays
+focused on product use, and a top-bar warning links you to Monitoring when
+something is wrong there.
+
+---
+
+## Monitoring
+
+The operational dashboard (Settings → Monitoring), for whoever runs the
+daemon. It updates live from the same WebSocket as the Cockpit and shows:
+
+- **Ingestion (parquet)** — files and records written, flush timings
+  (last/avg/max), and the last-flush detail. The "are flows landing and
+  importing fast" signal.
+- **Memory** — heap in-use (the leak signal), the RSS ceiling, goroutines,
+  GC cycles, and the sessions-in-RAM gauge.
+- **Pipeline** — per-channel saturation and UDP drops.
+- **Database** — a live "ps for the database". obserae writes through a
+  **single** connection, so when ingestion slows the question is always
+  "what is holding that connection?". The writer-pool header shows `in-use`,
+  a live **wait Δ**, and (muted) the cumulative totals; a **Writer
+  contention** banner appears only when the per-interval wait crosses the
+  threshold (*not* when the cumulative total is high — that only ever grows).
+  Below it, **In-flight operations** lists what's running (the writer op is
+  flagged `RUNNING`) and **Recent operations** shows the last ops that
+  completed, with their duration and any error — so DB activity is visible
+  even when nothing is in flight. It's the GUI twin of `obserae-cli ps`
+  (see [cli.md](cli.md#ps)); reach for it the moment flows/s drops.
 
 ---
 

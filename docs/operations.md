@@ -227,9 +227,9 @@ The journal is *tamper-evident*: each entry is cryptographically linked to the
 one before it (a SHA-256 hash chain), and closed files are anchored by
 HMAC-signed **seals** stored separately under `<data_dir>/auditlog_seals/`. Any
 attempt to edit, reorder, insert or delete an entry breaks the chain or a seal
-and is detected. The seal key (`<data_dir>/auditlog.key`, generated on first
-boot) is what makes a forged seal impossible — **back it up offline and keep it
-somewhere other than the audit directory.**
+and is detected. The seal key is **derived from the master key** (see [Master
+key](#master-key)) — back up the master key and a forged seal is impossible to
+make.
 
 You can check integrity three ways:
 
@@ -247,7 +247,7 @@ directory), a dependency-free Python script ships in the repo:
 python3 tools/verify_auditlog.py \
     --dir   /evidence/auditlog \
     --seal-dir /evidence/auditlog_seals \
-    --key-file /secure/auditlog.key
+    --master-key-file /secure/masterkey.bin
 ```
 
 It exits `0` when the journal is intact and `1` when it was tampered with, and
@@ -308,6 +308,40 @@ find /var/lib/obserae/parquet -name '*.parquet' -mmin +1 -print | wc -l
 
 ---
 
+## Master key
+
+obserae keeps **one** at-rest key, `<data_dir>/masterkey.bin` (mode `0400`,
+configurable via `secrets.master_key_file`, created on first boot). Everything
+secret is derived from it with HKDF: the AES-256-GCM cipher that encrypts
+sensitive DuckDB columns (alert-output credentials, device API secrets, the
+session-signing key) **and** the HMAC key that signs the [audit-log
+seals](#proving-integrity). It lives outside the database so a DB copy alone
+reveals nothing.
+
+**Back it up.** Export it to your secret manager rather than leaving it on disk:
+
+- **GUI** — *Config I/O → Master key → Export master key…* shows it as base64 to
+  copy or download.
+- **CLI** — `obserae-cli masterkey export` (add `--output FILE` to write it).
+
+**Rotate it** by importing a new key — every secret is re-encrypted and every
+audit seal re-signed under the new key, **live, with no restart**:
+
+- **GUI** — *Config I/O → Master key → Import master key…*, paste the base64 key.
+- **CLI** — `obserae-cli masterkey import key.txt`.
+
+**Restore** onto a rebuilt instance by placing your backed-up `masterkey.bin`
+(mode `0400`) in the data directory *before the first boot*; obserae reuses an
+existing key rather than minting a new one.
+
+> **Upgrade note.** An instance from an older build that used two separate files
+> (`secrets.key` + `auditlog.key`) is migrated automatically at the first boot of
+> this version: the master key is created, all data is re-keyed under it, and the
+> old files are deleted. Export and back up the new key afterwards. This legacy
+> migration exists only in this version.
+
+---
+
 ## Backups
 
 Three things to back up:
@@ -319,14 +353,14 @@ Three things to back up:
    the daemon is idle is safe. For maximum safety, stop the daemon,
    copy, restart.
 
-2. **The secrets master key** at `<data_dir>/secrets.key`
-   (configurable via `secrets.master_key_file`, generated mode `0400`
-   on first boot) encrypts the sensitive columns *inside* that DuckDB
-   file — alert-output credentials and the session-signing key. Back
-   it up **offline, separately from the database**: a DB copy without
-   the key is useless for those secrets, and **losing the key makes
-   encrypted output credentials unrecoverable and logs every user
-   out** (a fresh key is generated and all sessions become invalid).
+2. **The master key** at `<data_dir>/masterkey.bin` (see [Master
+   key](#master-key)). It protects the sensitive columns *inside* the
+   DuckDB file (alert-output credentials, device API secrets, the
+   session-signing key) **and** the audit-seal authenticity. Back it up
+   **offline, separately from the database** — best, export it to a
+   secret manager. A DB copy without the key is useless for those
+   secrets, and **losing the key makes encrypted credentials
+   unrecoverable and logs every user out**.
 
 3. **Your authored content** — the whole configuration in one bundle:
 

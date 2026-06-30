@@ -92,6 +92,8 @@ Stages run **left-to-right**, like Unix pipes. A `WHERE` after a
 | `session_matches`      | One row per (session, rule) hit. JOIN with `sessions` to recover endpoints.           | `matched_at`    |
 | `enrichment_ranges`        | CIDR catalogue (cloud + threat). `WITHIN`-join a flow set against `cidr`. See [enrichment.md](enrichment.md). | `fetched_at`    |
 | `enrichment_ips`        | Insert-time dimension: one row per `(ip, source)` resolved at ingest. **Equi-join** on the IP — see [enrichment.md](enrichment.md#faster-the-enrichment_ips-table). | `resolved_at`   |
+| `arp`                  | ARP-table observations polled from your OPNsense firewalls (~10 min). The authoritative IP↔MAC binding the NetFlow pipeline cannot see. **Equi-join**/PIVOT on `ip`. See [Devices](sources.md#devices-page). | `timestamp`     |
+| `dhcp`                 | DHCP-lease observations polled from your OPNsense firewalls (~10 min). Resolves dynamic IPs to a hostname/MAC. **Equi-join**/PIVOT on `ip`. See [Devices](sources.md#devices-page). | `timestamp`     |
 
 `LAST` and `BETWEEN` always filter on the listed time column —
 syntax stays the same regardless of which table you query.

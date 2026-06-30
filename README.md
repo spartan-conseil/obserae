@@ -143,6 +143,7 @@ setup.
 | [IP Enrichment](docs/enrichment.md) | Use cloud, threat-intel, GeoIP and ASN ranges in queries. |
 | [Audit log](docs/web-gui.md#audit-log) | Track who changed what, and verify the tamper-evident trail. |
 | [Lifecycle](docs/lifecycle.md) | Manage retention, storage and backups. |
+| [Monitoring](docs/monitoring.md) | Watch ingestion throughput, pipeline saturation, memory and DB activity. |
 
 ### Production
 

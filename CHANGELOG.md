@@ -6,6 +6,88 @@ dates; binaries and Docker images for each version are on the
 [releases page](https://github.com/spartan-conseil/obserae/releases). This is a
 bird's-eye view, not an exhaustive commit log.
 
+## [0.25.0] — 2026-06-30
+
+- **CSRF tokens survive restarts and redeploys** (fix): the recurring
+  "csrf token missing or invalid" error — which forced you to open a private
+  browser window after an obserae change — is gone. The CSRF token is now a
+  signed value bound to your session (an HMAC derived from the master key), so it
+  is the same before and after a restart, the same across browser tabs, and
+  self-heals if the browser drops or desyncs the cookie. Security is **higher**,
+  not lower (the token can no longer be forged by setting a cookie). No action
+  needed; already-open tabs may need one reload right after the upgrade.
+
+- **Data epoch file lowercased** (internal): the data-format epoch authority is
+  now `data/data_version` (was `DATA_VERSION`), in step with the rest of the data
+  dir. **Upgrade is automatic**: the daemon renames the file in place once at the
+  first boot of this version. *This one-time rename is removed in the next
+  release.*
+
+- **Single master key** (new): obserae now keeps **one** at-rest key,
+  `masterkey.bin`, instead of two separate files (`secrets.key` and
+  `auditlog.key`). Everything else is derived from it with HKDF — the AES-256-GCM
+  cipher that protects stored secrets (alert credentials, device API secrets,
+  session keys) and the HMAC key that signs the audit-log seals. You can now
+  **export** the master key (base64) to your secret manager and **import** it
+  back, from *Config I/O → Master key* in the GUI or `obserae-cli masterkey
+  export|import`. Importing a different key **rotates** it: every secret is
+  re-encrypted and every audit seal re-signed live — no restart, no downtime.
+  Offline audit verification takes the master directly:
+  `verify-auditlog --master-key-file masterkey.bin` (the standalone Python
+  verifier too). **Upgrade is automatic**: an instance with the old two key files
+  is unified under `masterkey.bin` at the first boot of this version (the old
+  files are re-keyed, then deleted) — back up the new key. *Legacy support for the
+  old files is only in this version and will be removed next release.*
+
+- **OPNsense Devices connector** (new): a Connectors → Devices page (admin-only)
+  where you register your OPNsense firewalls (name, base URL, API key/secret —
+  the secret is encrypted at rest and never shown again, plus skip-TLS / Root-CA
+  options). obserae then polls each device every ~10 minutes (or on demand via
+  the per-row **Refresh** button) for its **ARP table**, **DHCP leases** and
+  **interface overview**, with a per-device OK/error status pill. The ARP and
+  DHCP observations become two new NFQL tables — `arp` and `dhcp` — that you can
+  query and equi-join/PIVOT against `flows.ip` / `sessions.ip` like any other
+  source: the authoritative IP↔MAC↔hostname ground truth the NetFlow pipeline
+  alone cannot see. The same data enriches the cartography: the DHCP hexagon
+  drawer shows the firewall's hostname/MAC/manufacturer for a lease, IP Discovery
+  lists ARP-seen IPs first with an `arp` tag, and Network Discovery proposes the
+  firewall's interface CIDRs as candidate subnets. Network and host **names**
+  come from the firewall too: a subnet detected from traffic that matches an
+  interface is suggested with that interface's name (`WAN`, `LAN`, …) instead of
+  a generic slug, and adopting a discovered IP names the new host after its
+  ARP/DHCP hostname (falling back to the `?<ip>` placeholder when none is known
+  or the name is taken). Devices are part of the **Config I/O** bundle
+  (export/import); the `api_secret` is exported in its encrypted form (never in
+  clear text) — re-importable on the same instance. Adding a device now collects
+  it immediately (its data appears in the drawer without reloading the page),
+  and the DHCP lease panel was made legible.
+
+- **Alert rules no longer self-disable during parquet compaction** (fix): an alert
+  rule could be quarantined with `IO Error: Cannot open file …sessions-*.parquet:
+  No such file or directory` whenever the background compactor merged an hour's
+  session files at the exact moment the rule's query was reading them. The query
+  engine now retries that transient "file vanished mid-read" race (the same guard
+  the cartography and health screens already used), so it never surfaces. The fix
+  covers every parquet reader that lacked it: interactive NFQL queries, the alert
+  evaluator, the matcher, network-discovery aggregation, and the rule match view.
+
+- **Monitoring page** (new): a Settings → Monitoring screen for sysadmins and SOC
+  engineers. It surfaces parquet **ingestion** throughput and import timing (files
+  and records written, flush last/avg/max), **pipeline** saturation (channel fill +
+  UDP drops), **memory** (heap in-use, RSS ceiling, goroutines, GC, sessions in RAM),
+  and **database** activity shown *permanently* — the in-flight operations plus a
+  recent-operations ring (like `obserae-cli ps`), not just whatever happens to be
+  running at the instant you look. The DB-activity panel was removed from the Cockpit
+  (which stays focused on product use); when there is a real database or ingestion
+  problem a warning icon appears in the top bar, from any page, linking to Monitoring.
+
+- **Move a whole multi-selection in the cartography** (fix): in edit mode, selecting
+  several hosts/networks (shift+click or box-select) and then dragging only moved the
+  node under the cursor — the rest of the selection stayed behind. Dragging any selected
+  node now translates the entire selection together and persists each node's new
+  position.
+
+
 ## [0.24.0] — 2026-06-26
 
 - **No more silent session loss under storage pressure** (fix): when the disk or

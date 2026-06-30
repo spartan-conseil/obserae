@@ -1,10 +1,12 @@
 # Connectors
 
 The **Connectors** menu group gathers everything that *produces
-data* for obserae. Five pages cover the data sources:
+data* for obserae. Six pages cover the data sources:
 
 - **Exporters** (`/exporters`) — the switches, firewalls, routers
   and probes that emit flow records toward the daemon;
+- **Devices** (`/devices`) — your OPNsense firewalls, polled for their
+  ARP table, DHCP leases and interface overview (admin-only);
 - **Cloud Attribution** (`/cloud-attribution`) — the cloud-provider
   attribution sources (AWS, Azure, Google, Oracle, Cloudflare);
 - **Threat Intelligence** (`/threat-intel`) — the open-source
@@ -15,7 +17,7 @@ data* for obserae. Five pages cover the data sources:
   built from the ip2asn dataset.
 
 Open them from the sidebar under **Connectors**
-(🖧 Exporters · ☁ Cloud Attribution · 🛡 Threat Intelligence · 🌐 GeoIP · ⑂ ASN).
+(🖧 Exporters · 🧱 Devices · ☁ Cloud Attribution · 🛡 Threat Intelligence · 🌐 GeoIP · ⑂ ASN).
 
 ---
 
@@ -88,6 +90,94 @@ the row is only removed once you confirm.
 > your label. Delete is therefore meant for samplers that have
 > actually stopped emitting; deleting one that is still active just
 > resets its label on the next sweep.
+
+---
+
+## Devices page
+
+> **Admin-only.** This page requires the `devices:manage` permission.
+
+Where the Exporters page labels devices that *emit* flow records, the
+**Devices** page connects obserae to your **OPNsense firewalls** to pull
+**ground truth** the NetFlow pipeline alone cannot see: which MAC address
+holds which IP (ARP), which hostnames the DHCP server handed out, and the
+firewall's own interface subnets. obserae uses this to resolve IPs to
+real hostnames/MACs in the cartography and to expose two new NFQL tables
+(`arp`, `dhcp`) you can query and join against your flows and sessions.
+
+### Adding an OPNsense device
+
+Click **Add device** and fill in:
+
+| Field             | What it is                                                       |
+|-------------------|-----------------------------------------------------------------|
+| **Name**          | A friendly name for the firewall (e.g. `opnsense-edge`).        |
+| **Base URL**      | The firewall's web URL, e.g. `https://192.0.2.1`.              |
+| **API key**       | The OPNsense API key (see below).                              |
+| **API secret**    | The matching API secret. **Encrypted at rest** with the master key and **never shown again** — to change it you re-enter it. |
+| **Skip TLS verify** | Toggle on if the firewall uses a self-signed certificate and you have no CA to pin. |
+| **Root CA (PEM)** | Optional: paste your firewall's CA certificate to verify TLS properly instead of skipping verification. |
+
+**Where to get the API key/secret in OPNsense:** in the firewall's web
+UI go to **System → Access → Users**, open (or create) a user, and under
+**API keys** click **+** to generate a key/secret pair. OPNsense downloads
+a small text file containing both — copy them into the fields above.
+
+### Refresh and status
+
+obserae polls each device **every ~10 minutes** automatically. A poll
+also runs immediately when you add a device, and you can force one any
+time with the per-row **↻ Refresh** button.
+
+Each row shows a status **pill**:
+
+- a green **OK** pill with the last successful poll time (`last_collected_at`);
+- a red **error** pill carrying the last error message if the most recent
+  poll failed (wrong credentials, unreachable host, TLS mismatch …).
+
+A failing device never blocks the others and never delays the daemon
+boot — the error is recorded and the device is retried on the next cycle.
+
+### What gets collected
+
+Each poll pulls three things from the firewall:
+
+- **ARP table** — every IP↔MAC binding the firewall currently sees,
+  appended to an append-only store and exposed as the NFQL `arp` table.
+- **DHCP leases** — the active leases (IP, MAC, hostname, lease type),
+  exposed as the NFQL `dhcp` table.
+- **Interface overview** — the firewall's interfaces and their CIDRs
+  (Loopback and unassigned interfaces are filtered out), kept as a fresh
+  snapshot that is replaced on every refresh.
+
+### Where this data shows up
+
+- **NFQL** — query `FROM arp` / `FROM dhcp` like any other table, and
+  equi-join or `PIVOT` them against `flows.ip` / `sessions.ip` on `ip`
+  to attach a MAC/hostname to traffic. See [NFQL](nfql.md#tables).
+- **Cartography → DHCP hexagon** — a network's DHCP drawer shows the
+  firewall-reported hostname, MAC and manufacturer for each lease,
+  tagged by source (NetFlow, OPNsense, or both).
+- **Cartography → IP Discovery** — IPs the firewall has seen in ARP are
+  listed **first**, carrying an `arp` tag with their MAC/hostname. When you
+  adopt one, the new host is **named after its hostname** (ARP first, then the
+  DHCP lease); if no hostname is known — or the name is already taken — it
+  falls back to the `?<ip>` placeholder you can rename later.
+- **Cartography → Network Discovery** — the firewall's interface CIDRs
+  are proposed as candidate subnets to declare as networks, and a subnet
+  detected from traffic that matches an interface is **suggested with that
+  interface's name** (e.g. `WORK`) instead of a generic slug. Network
+  names are matched **case-insensitively** (so `WAN` maps to `wan`).
+
+### Backup &amp; export
+
+Devices are part of the [Config I/O](configuration.md) bundle, so an
+export/import carries your firewall connectors with everything else. The
+`api_secret` is exported in its **encrypted** form (the `enc:v1:` envelope),
+never in clear text. Because that envelope is sealed with this instance's
+master key (`data/secrets.key`), a bundle restores a working secret **on the
+same instance**; importing it on a fresh instance (different master key) keeps
+the device but you must re-enter its API secret.
 
 ---
 

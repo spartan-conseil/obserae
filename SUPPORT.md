@@ -8,11 +8,9 @@ what to expect.
 
 A quick check often answers it faster than a round-trip:
 
-- **The documentation** — start with the [README](README.md), then the relevant
-  page: [Installation](docs/installation.md),
-  [Configuring Exporters](docs/exporters.md),
-  [Operations & troubleshooting](docs/operations.md), or the
-  [Configuration reference](docs/configuration.md).
+- **The documentation** — the full guides live at
+  [obserae.com](https://obserae.com): start with Installation, then Configuring
+  Exporters, Operations & troubleshooting, and the Configuration reference.
 - **Common gotchas** — the login loop over plain HTTP and the NetFlow v9 /
   IPFIX template warm-up (flows visible in `tcpdump` but the counter stays at 0)
   are documented in Installation and Configuring Exporters.
@@ -45,7 +43,7 @@ reasonable window to fix it before any public disclosure.
 
 - **Free / alpha** — best-effort help through GitHub issues, with no service-level
   guarantee (EULA art. 8). obserae is built by a small shop, so please be patient.
-- **Commercial licence** — technical support, priority fixes, SLAs and custom
+- **Commercial license** — technical support, priority fixes, SLAs and custom
   development are part of a commercial agreement. See
   [Licensing & transparency](LICENSING.md) or write to
   <licensing@spartan-conseil.fr>.

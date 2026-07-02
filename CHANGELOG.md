@@ -6,6 +6,91 @@ dates; binaries and Docker images for each version are on the
 [releases page](https://github.com/spartan-conseil/obserae/releases). This is a
 bird's-eye view, not an exhaustive commit log.
 
+## [0.26.0] — 206-07-02
+
+- **LDAP / Active Directory sign-in (hybrid with local accounts)**: employees
+  can now log in with their Active Directory credentials alongside the existing
+  local accounts. obserae verifies passwords with a service-account
+  **search-and-bind** over LDAPS/STARTTLS, maps AD groups to obserae roles
+  (refreshed on every login), and just-in-time provisions a shadow account on
+  first sign-in. The built-in **admin** always stays a local **break-glass**
+  login, so you keep access even when the directory is unreachable. Configure it
+  on the new **Settings → Authentication** page (or `obserae-cli ldap set/test`);
+  the service-account password is encrypted at rest. No SSO/OIDC yet.
+
+- **NFQL decimal literals** (`20.5`, `0.95`): the query language now accepts
+  fractional numeric literals, typed `DOUBLE` and comparable with integer/bigint
+  values. This makes the statistical aggregates finally usable in a filter —
+  `... | STATS sd = STDDEV(bytes) BY src_addr | HAVING sd > 20.5` — where before a
+  `DOUBLE` from `STDDEV`/`MEDIAN`/`PERCENTILE` could not be compared to any
+  threshold. No scientific notation; `PERCENTILE`'s rank stays an integer `1..99`.
+
+- **Rule-set dry-run reports every broken rule at once**: validating a rule
+  pack now compiles *all* rules and lists every NFQL compile error together,
+  instead of stopping at the first. An author of a large pack fixes the whole
+  batch in one pass. The Rule Sets page shows the full list and disables
+  **Install** until the pack is clean; import still refuses a pack with any
+  failing rule.
+
+- **improve rule sets** community and enterprise.
+
+- **Alert rules now evaluate in parallel** (performance): within each evaluation
+  cycle the due rules' NFQL queries run concurrently — fanned out across a worker
+  pool bounded by `storage.reader_conns` (default 4) — instead of strictly one at
+  a time. A cycle's wall-clock drops from *sum of all due rules* to roughly *that
+  sum ÷ reader_conns*, so deployments with many or heavy rules stop triggering the
+  *"alert evaluation over budget"* warning. Results are still folded back in rule
+  order and written in a single transaction per cycle (unchanged atomicity), and a
+  slow/failing rule still can't starve or fail the cycle. Note: DuckDB already
+  parallelises each individual query across cores, so on a CPU-bound host with many
+  heavy rules you may want to lower `storage.max_threads` or space heavy rules out.
+
+- **Unified daemon status snapshot** (`GET /api/status` + `obserae-cli status`):
+  the authenticated web endpoint and the CLI command now return **one shared
+  payload** — build version & uptime, data-format epoch, flow/session/rule and
+  **cartography** counts, NetFlow **template** diagnostics, an alert roll-up (by
+  status, by severity, plus 1h/24h windows), coverage, parquet-ingestion timing,
+  storage usage (DuckDB file size, free/total disk on the database mount,
+  parquet-buffer and backup directory sizes), runtime memory/goroutines and the
+  audit-integrity verdict. Both surfaces are served by one shared collector, so
+  they can never drift; the CLI output gains everything the API had (alerts,
+  ingestion, storage, runtime, coverage) and the API gains what only the CLI had
+  (cartography, templates, data-format epoch). It is the authenticated
+  counterpart to the public `/healthz` liveness probe and is protected by an API
+  token carrying the new **`monitoring:read`** permission; a matching built-in
+  **monitoring** group ships with just that permission, so you can create a
+  dedicated, least-privilege supervision user (admins hold it automatically).
+  When the web GUI is disabled the producer-derived live metrics read zero and
+  the payload's `live_metrics_available` flag is `false` (the counts, gauges,
+  storage and alerts stay accurate). *Note: this endpoint was `GET /api/overview`
+  earlier in this pre-release; it was renamed to `/api/status` with no alias.*
+  
+- **Cartography alert count now agrees with the Detection page** (fix): hovering
+  a host showed e.g. "5 medium ssh" while the Detection list looked empty. Two
+  causes, both fixed: the hover counts a **30-day** window (now spelled out in
+  the tooltip: "N active alerts · last 30d") while Detection defaulted to 24h, so
+  the host's older alerts were simply out of view; and the "Triggers"/rule links
+  from a host now open Detection on that **same 30-day window**. On top of that,
+  filtering Detection **by an IP** (the *Filter by entity key* box, or a link
+  from a host) now also finds alerts from rules that don't group by entity — like
+  *ssh detected* — whose address lives in the sample rows rather than the entity
+  key. Previously those were invisible when filtered by IP.
+
+- **OPNsense DHCP: Kea and Dnsmasq support**: the Devices connector now reads
+  DHCP leases from whichever backend your firewall runs — **Kea**, **Dnsmasq**
+  or the legacy **ISC dhcpd** — automatically, instead of only ISC. If more than
+  one backend answers (a misconfiguration — only one should be active), obserae
+  ingests the highest-priority one (Kea › Dnsmasq › ISC) and flags the device
+  row with a **yellow ⚠**; hover it for the explanation. As part of this, each
+  device is polled on its own, so one unreachable firewall no longer holds up
+  the others.
+
+- **Removed the one-time 0.25.0 upgrade shims** (internal): the boot-time
+  `DATA_VERSION` → `data_version` file rename and the legacy
+  `secrets.key`/`auditlog.key` → `masterkey.bin` unification are gone now that
+  they have done their job. **Upgrades must come from 0.25.0 or later** — an
+  instance still on those legacy layouts must boot 0.25.0 once before upgrading.
+
 ## [0.25.0] — 2026-06-30
 
 - **CSRF tokens survive restarts and redeploys** (fix): the recurring
@@ -126,7 +211,7 @@ bird's-eye view, not an exhaustive commit log.
   half-finished migration. Additive changes (a new column/field) cost no copy at
   all. `obserae-cli status` shows the current data version; `obserae migrate
   status` and `obserae migrate restore` inspect and roll back from the command
-  line. See [Data migrations](docs/migrations.md).
+  line. See [Data migrations](https://obserae.com/docs/migrations).
 
 - **Interactive query path extracted to a testable service** (OBS-AUD-012): the
   NFQL execution logic behind the Investigation page (snapshot lock, as-of
@@ -193,7 +278,7 @@ bird's-eye view, not an exhaustive commit log.
   closed-source, these artifacts let you prove a download's integrity,
   authenticity and origin before running it. No key to manage — verification uses
   the public Rekor transparency log. See the new
-  [Verify a Release](docs/verify.md) guide.
+  [Verify a Release](https://obserae.com/docs/verify) guide.
   
 - **Secrets encrypted at rest**: alert-output credentials (Slack/Telegram/SMTP/
   webhook tokens, Splunk/PagerDuty/Elasticsearch keys) and the session-signing

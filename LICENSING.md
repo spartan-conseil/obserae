@@ -3,7 +3,7 @@
 obserae is **closed-source, free-to-use** software published by Spartan Conseil
 Cybersécurité. This page answers, in plain language, the questions people
 reasonably ask about a closed-source tool they're about to run on their network.
-It does not replace the licence — the binding terms are in `EULA.txt` (French)
+It does not replace the license — the binding terms are in `EULA.txt` (French)
 and `EULA.en.txt` (English courtesy translation), bundled with every release and
 Docker image.
 
@@ -17,7 +17,7 @@ No. obserae ships as **proprietary binaries and Docker images; the source code
 is not public.** You are free to download it, run it, configure it and file
 issues — but not to read, modify or redistribute the source. A public GitHub
 repository for docs, releases and issues is not the same as an open-source
-licence, and we'd rather say so up front than have you find it in the fine print.
+license, and we'd rather say so up front than have you find it in the fine print.
 
 That said, the source is **available for security review on request**: a
 qualified reviewer evaluating obserae for production (say, a security team that
@@ -33,7 +33,7 @@ Yes, for two groups (EULA art. 2):
 - **Eligible small business** — a group of **≤ 20 people *and* ≤ €2,000,000**
   annual revenue. Both criteria are cumulative.
 
-It is **self-assessed**: there is no licence key, no sign-up, no activation.
+It is **self-assessed**: there is no license key, no sign-up, no activation.
 During the alpha, every feature is open to everyone.
 
 ## Why are there limits, if it's free?
@@ -41,7 +41,7 @@ During the alpha, every feature is open to everyone.
 obserae is both a passion and a business, and the bills are real. The aim is to
 be generous — free for individuals and small businesses, one-off audits allowed,
 every feature open during the alpha — without leaving the door open to abuse.
-Software usually ends up *tightening* its licence because of abuse at scale, so
+Software usually ends up *tightening* its license because of abuse at scale, so
 obserae keeps a **few structural limits** rather than an unverifiable "fair use"
 clause.
 
@@ -53,14 +53,14 @@ is *for*.
 
 ## I run a bigger company / an MSP / a paid service on it?
 
-Then you need a **commercial licence** (EULA art. 3) — for any organisation above
+Then you need a **commercial license** (EULA art. 3) — for any organisation above
 the small-business threshold, for offering obserae as a managed service
 (MSSP / SOC-as-a-service), or for paid services (audit, consulting, integration,
 training) delivered to a client above the threshold. One narrow exception
 (art. 4): an independent consultant may run a **one-off audit of ≤ 30 days** on a
 larger client's infrastructure, provided the software is removed and the data
 purged at the end and the report states that permanent use requires a commercial
-licence.
+license.
 
 Commercial contact: <licensing@spartan-conseil.fr>.
 
@@ -75,7 +75,7 @@ later. All of them are **free and open during the alpha**:
 - **Audit log** — the tamper-evident *who-did-what-when* journal.
 - **Connectors to major commercial platforms** — the exact list is still open,
   but, for example, a connector that ships obserae's alerts into a SIEM such as
-  IBM QRadar will be part of the commercial licence.
+  IBM QRadar will be part of the commercial license.
 - **Commercial IP-enrichment sources** — premium, cyber-grade enrichment feeds.
   (The free public sources — AWS, Azure, GCP, FireHOL — stay free.)
 
@@ -86,7 +86,7 @@ expensive commercial ecosystem.
 
 ## Can the terms change under me later?
 
-Not for a version you already have. The licence is **versioned per release**: the
+Not for a version you already have. The license is **versioned per release**: the
 terms that shipped with your version are yours to keep, for that version, for
 good (EULA art. 2.3). If the terms ever change, the change applies only to
 *future* versions — downloading one release does not put you at the mercy of
@@ -96,7 +96,7 @@ whatever a later one decides. Nobody is taken hostage.
 
 No. The EULA commits to it contractually (art. 7): **no usage telemetry, no
 outbound contact with Spartan Conseil's or any third party's servers, and no
-online licence verification.** obserae is built to run fully air-gapped.
+online license verification.** obserae is built to run fully air-gapped.
 
 The only outbound network traffic obserae makes is traffic **you** turn on:
 
@@ -112,16 +112,16 @@ Nothing. Your flows, cartography, detection rules, sessions and reports are your
 **sole property**; Spartan Conseil has no access to them and claims no rights
 over them (EULA art. 6.3).
 
-## Do I need a licence key or internet access to run it?
+## Do I need a license key or internet access to run it?
 
 No key, no activation, no online check. obserae runs entirely offline — core
 ingestion, queries and the GUI have no external dependency.
 
 ## What happens if the project stops, or Spartan Conseil disappears?
 
-Your installation keeps working. There is **no remote kill-switch and no licence
+Your installation keeps working. There is **no remote kill-switch and no license
 check to fail**, so an installed copy keeps running with no internet and no
-contact with anyone. The licence text and binaries are bundled locally, and your
+contact with anyone. The license text and binaries are bundled locally, and your
 data stays yours.
 
 ## Can I modify, redistribute or reverse-engineer it?
@@ -141,7 +141,7 @@ suggestions genuinely help. Open them at
 
 ## Is there support or an SLA?
 
-The free licence comes with **no support obligation** — updates are published at
+The free license comes with **no support obligation** — updates are published at
 the publisher's discretion (EULA art. 8). Technical support, priority fixes, SLAs
 and custom development are part of commercial agreements.
 

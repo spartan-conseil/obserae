@@ -68,8 +68,8 @@ vulnerabilities on their own:
 - missing hardening headers or "best practices" without a demonstrated exploit;
 - issues that require an already-compromised host or physical access;
 - the security of a deployment's own reverse proxy, TLS or OS configuration —
-  that is the operator's responsibility (see [Operations](docs/operations.md)
-  and [Installation](docs/installation.md)).
+  that is the operator's responsibility (see [Operations](https://obserae.com/docs/operations)
+  and [Installation](https://obserae.com/docs/installation)).
 
 ## Source access for review
 

@@ -1,0 +1,11 @@
+# PRE-PRODUCTION reverse proxy.
+{
+	admin off
+	auto_https disable_redirects
+}
+
+caddy-preprod.corp.lan, staging.corp.lan {
+	tls internal
+	reverse_proxy 10.0.30.20:8000
+	header X-Env preprod
+}

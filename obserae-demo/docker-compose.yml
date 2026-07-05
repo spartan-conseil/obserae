@@ -1,0 +1,481 @@
+# =============================================================================
+#  obserae demo lab -- simulated enterprise infrastructure
+# -----------------------------------------------------------------------------
+#  Segments (Docker bridge networks, each with a fixed bridge name so the sensor
+#  can capture it):
+#
+#    mgmt      10.0.0.0/24   obs-mgmt      obserae (collector + UI)
+#    dmz       10.0.10.0/24  obs-dmz       internal DNS
+#    prod      10.0.20.0/24  obs-prod      Caddy + backend + PostgreSQL
+#    preprod   10.0.30.0/24  obs-preprod   Caddy + backend + PostgreSQL
+#    work      10.0.40.0/24  obs-work      5 Linux workstations
+#
+#  A central router/firewall (lab) interconnects dmz/prod/preprod/work WITHOUT
+#  east-west NAT, so the real source IPs are preserved (essential for the
+#  obserae cartography "who talks to whom").
+#
+#  The sensor (softflowd, network_mode host) captures the obs-* bridges and
+#  exports NetFlow v9 to obserae. It plays the role of a NetFlow exporter.
+#  NOTE: obserae ingests NetFlow v5/v9 on UDP 2055 only (no IPFIX).
+# =============================================================================
+name: obserae-demo
+
+# --- Shared anchor: allow adding internal routes inside the container --------
+x-netadmin: &netadmin
+  cap_add:
+    - NET_ADMIN
+
+# --- Shared workstation activity-intensity knob ------------------------------
+x-activity: &activity
+  ACTIVITY_MIN_SLEEP: "${ACTIVITY_MIN_SLEEP:-4}"
+  ACTIVITY_MAX_SLEEP: "${ACTIVITY_MAX_SLEEP:-12}"
+
+services:
+
+  # ===========================================================================
+  #  COLLECTOR
+  # ===========================================================================
+  obserae:
+    image: ${OBSERAE_IMAGE:-ghcr.io/spartan-conseil/obserae:latest}
+    container_name: obserae
+    restart: unless-stopped
+    networks:
+      mgmt:
+        ipv4_address: 10.0.0.10
+      # Second leg into the DMZ so obserae can reach the FreeIPA directory
+      # (10.0.10.20) for LDAP authentication. mgmt stays isolated from the
+      # router; this is a direct L2 path on the DMZ segment.
+      dmz:
+        ipv4_address: 10.0.10.5
+    # Match the LDAPS certificate CN without depending on dnsmasq for obserae.
+    extra_hosts:
+      - "ipa.corp.lan:10.0.10.20"
+    ports:
+      # Web UI (bound to the host loopback only; there is no built-in auth).
+      - "127.0.0.1:8081:8080/tcp"
+      # NetFlow ingest -- also published on the host in case you want to point
+      # an external exporter at it. The internal sensor targets 10.0.0.10:2055.
+      - "127.0.0.1:2054:2055/udp"
+    volumes:
+      # Holds the DuckDB database and the parquet buffer (survives restarts).
+      - obserae-data:/var/lib/obserae
+
+  # ===========================================================================
+  #  FLOW SENSOR (softflowd) -- captures the bridges, exports NetFlow v9
+  # ===========================================================================
+  sensor:
+    build: ./images/labtools
+    image: obserae-demo/labtools
+    container_name: sensor
+    restart: unless-stopped
+    # Access to the host bridge interfaces (obs-*).
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      OBSERAE_TARGET: "10.0.0.10"
+      OBSERAE_PORT: "2055"     # obserae NetFlow ingest port
+      FLOW_VERSION: "9"        # NetFlow v9 (obserae supports v5/v9, no IPFIX)
+      CAPTURE_IFACES: "obs-dmz obs-prod obs-preprod obs-work"
+      FLOW_MAXLIFE: "60"
+    volumes:
+      - ./sensor/run-softflowd.sh:/run-softflowd.sh:ro
+    command: ["/bin/bash", "/run-softflowd.sh"]
+    depends_on:
+      - obserae
+
+  # ===========================================================================
+  #  CENTRAL ROUTER / FIREWALL -- interconnects the segments (no east-west NAT)
+  # ===========================================================================
+  router:
+    build: ./images/labtools
+    image: obserae-demo/labtools
+    container_name: router
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      net.ipv4.ip_forward: "1"
+    networks:
+      dmz:
+        ipv4_address: 10.0.10.2
+      prod:
+        ipv4_address: 10.0.20.2
+      preprod:
+        ipv4_address: 10.0.30.2
+      work:
+        ipv4_address: 10.0.40.2
+    command: ["sleep", "infinity"]
+
+  # ===========================================================================
+  #  DMZ -- internal DNS
+  # ===========================================================================
+  dns:
+    build: ./images/labtools
+    image: obserae-demo/labtools
+    container_name: dns
+    restart: unless-stopped
+    <<: *netadmin
+    networks:
+      dmz:
+        ipv4_address: 10.0.10.10
+    volumes:
+      - ./dns/dnsmasq.conf:/etc/dnsmasq/dnsmasq.conf:ro
+    # Return route to the other segments via the router, then start dnsmasq.
+    command:
+      - /bin/bash
+      - -c
+      - |
+        ip route replace 10.0.0.0/8 via 10.0.10.2 || true
+        exec dnsmasq -k --conf-file=/etc/dnsmasq/dnsmasq.conf
+    depends_on:
+      - router
+
+  # ===========================================================================
+  #  DMZ -- FreeIPA (identity / LDAP directory)
+  # ---------------------------------------------------------------------------
+  #  Realm CORP.LAN. No integrated DNS (dnsmasq already owns corp.lan), so it is
+  #  installed with --no-host-dns and without --setup-dns. obserae authenticates
+  #  its users against this directory over LDAPS (see scripts/setup-ldap.sh).
+  #  FreeIPA runs systemd inside the container (see the cgroup settings below);
+  #  the first boot provisions the directory and can take several minutes.
+  # ===========================================================================
+  freeipa:
+    image: freeipa/freeipa-server:rocky-9
+    container_name: freeipa
+    hostname: ipa.corp.lan
+    restart: unless-stopped
+    dns: ["10.0.10.10"]
+    networks:
+      dmz:
+        ipv4_address: 10.0.10.20
+    environment:
+      IPA_SERVER_HOSTNAME: ipa.corp.lan
+      IPA_SERVER_IP: "10.0.10.20"
+      PASSWORD: ObseraeDemo123      # admin + Directory Manager (demo value)
+    # This image's entrypoint (/usr/local/sbin/init) grammar is:
+    #   [control-token] ipa-server-install [options]
+    # The `no-exit` token makes systemd stay up even if the first-boot install
+    # FAILS, so the container stays alive for `docker compose logs`/`exec` instead
+    # of powering off into a restart loop -- essential for diagnosing. The whole
+    # command is ignored on later boots once /data is already provisioned.
+    # --skip-mem-check: in a container on cgroup v2, ipa-server-install cannot read
+    # the available RAM and aborts ("Unable to determine the amount of available
+    # RAM"); this skips that pre-check (it is a detection failure, not a shortage).
+    command: ["no-exit", "ipa-server-install", "-U", "-r", "CORP.LAN", "-n", "corp.lan", "--no-ntp", "--no-host-dns", "--skip-mem-check"]
+    # --- systemd (PID 1) needs a WRITABLE cgroup or it dies before the install ---
+    # On this cgroup v2 host with Docker >= 25, an unprivileged container's
+    # /sys/fs/cgroup is read-only; "cgroup: private" alone left systemd with no
+    # writable cgroup, so PID 1 exited immediately (exit 0 then 255, no logs). The
+    # working recipe is to join the host cgroup namespace AND bind-mount the cgroup
+    # hierarchy read-write.
+    # SECURITY NOTE: this exposes the host cgroup tree to the container (a
+    # container-escape surface). Accepted for this LOCAL DEMO lab only, because
+    # "cgroup: private" is proven not to boot systemd here, and it still avoids the
+    # far broader "privileged: true". Do NOT set "init: true" (tini would replace
+    # systemd as PID 1 and break the container).
+    cgroup: host
+    security_opt:
+      - seccomp:unconfined
+    # FreeIPA/389-ds require IPv6 with ::1 on the loopback, or the installer aborts.
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv6.conf.lo.disable_ipv6=0
+    # Match the image STOPSIGNAL and give systemd real time to shut down cleanly.
+    stop_signal: SIGRTMIN+3
+    stop_grace_period: 45s
+    tmpfs:
+      - /run
+      - /tmp
+    volumes:
+      - freeipa-data:/data
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    depends_on:
+      - dns
+
+  # ===========================================================================
+  #  PRODUCTION -- Caddy + backend + PostgreSQL
+  # ===========================================================================
+  db-prod:
+    build: ./images/postgres
+    image: obserae-demo/postgres
+    container_name: db-prod
+    restart: unless-stopped
+    <<: *netadmin
+    networks:
+      prod:
+        ipv4_address: 10.0.20.30
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: appdb
+    volumes:
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        ip route replace 10.0.0.0/8 via 10.0.20.2 || true
+        exec docker-entrypoint.sh postgres
+    depends_on:
+      - router
+
+  backend-prod:
+    build: ./images/labtools
+    image: obserae-demo/labtools
+    container_name: backend-prod
+    restart: unless-stopped
+    <<: *netadmin
+    networks:
+      prod:
+        ipv4_address: 10.0.20.20
+    environment:
+      APP_ENV: prod
+      PGHOST: "10.0.20.30"
+    volumes:
+      - ./backend/app.py:/app/app.py:ro
+    command:
+      - /bin/bash
+      - -c
+      - |
+        ip route replace 10.0.0.0/8 via 10.0.20.2 || true
+        exec python3 /app/app.py
+    depends_on:
+      - db-prod
+
+  caddy-prod:
+    build: ./images/caddy
+    image: obserae-demo/caddy
+    container_name: caddy-prod
+    restart: unless-stopped
+    <<: *netadmin
+    networks:
+      prod:
+        ipv4_address: 10.0.20.10
+    volumes:
+      - ./caddy/Caddyfile.prod:/etc/caddy/Caddyfile:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        ip route replace 10.0.0.0/8 via 10.0.20.2 || true
+        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+    depends_on:
+      - backend-prod
+
+  # ===========================================================================
+  #  PRE-PRODUCTION -- Caddy + backend + PostgreSQL
+  # ===========================================================================
+  db-preprod:
+    build: ./images/postgres
+    image: obserae-demo/postgres
+    container_name: db-preprod
+    restart: unless-stopped
+    <<: *netadmin
+    networks:
+      preprod:
+        ipv4_address: 10.0.30.30
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: appdb
+    volumes:
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        ip route replace 10.0.0.0/8 via 10.0.30.2 || true
+        exec docker-entrypoint.sh postgres
+    depends_on:
+      - router
+
+  backend-preprod:
+    build: ./images/labtools
+    image: obserae-demo/labtools
+    container_name: backend-preprod
+    restart: unless-stopped
+    <<: *netadmin
+    networks:
+      preprod:
+        ipv4_address: 10.0.30.20
+    environment:
+      APP_ENV: preprod
+      PGHOST: "10.0.30.30"
+    volumes:
+      - ./backend/app.py:/app/app.py:ro
+    command:
+      - /bin/bash
+      - -c
+      - |
+        ip route replace 10.0.0.0/8 via 10.0.30.2 || true
+        exec python3 /app/app.py
+    depends_on:
+      - db-preprod
+
+  caddy-preprod:
+    build: ./images/caddy
+    image: obserae-demo/caddy
+    container_name: caddy-preprod
+    restart: unless-stopped
+    <<: *netadmin
+    networks:
+      preprod:
+        ipv4_address: 10.0.30.10
+    volumes:
+      - ./caddy/Caddyfile.preprod:/etc/caddy/Caddyfile:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        ip route replace 10.0.0.0/8 via 10.0.30.2 || true
+        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+    depends_on:
+      - backend-preprod
+
+  # ===========================================================================
+  #  WORKSTATIONS (x5) -- generate user activity
+  # ===========================================================================
+  ws1:
+    build: ./images/labtools
+    image: obserae-demo/labtools
+    container_name: ws1
+    restart: unless-stopped
+    <<: *netadmin
+    hostname: ws1-dev
+    dns: ["10.0.10.10"]
+    networks:
+      work:
+        ipv4_address: 10.0.40.11
+    environment:
+      <<: *activity
+      ROLE: dev
+    volumes:
+      - ./workstations/user-activity.sh:/app/user-activity.sh:ro
+    command: &ws_cmd
+      - /bin/bash
+      - -c
+      - |
+        ip route replace 10.0.0.0/8 via 10.0.40.2 || true
+        exec bash /app/user-activity.sh
+    depends_on: [router, dns, caddy-prod, caddy-preprod]
+
+  ws2:
+    build: ./images/labtools
+    image: obserae-demo/labtools
+    container_name: ws2
+    restart: unless-stopped
+    <<: *netadmin
+    hostname: ws2-ops
+    dns: ["10.0.10.10"]
+    networks:
+      work:
+        ipv4_address: 10.0.40.12
+    environment:
+      <<: *activity
+      ROLE: ops
+    volumes:
+      - ./workstations/user-activity.sh:/app/user-activity.sh:ro
+    command: *ws_cmd
+    depends_on: [router, dns, caddy-prod, caddy-preprod]
+
+  ws3:
+    build: ./images/labtools
+    image: obserae-demo/labtools
+    container_name: ws3
+    restart: unless-stopped
+    <<: *netadmin
+    hostname: ws3-finance
+    dns: ["10.0.10.10"]
+    networks:
+      work:
+        ipv4_address: 10.0.40.13
+    environment:
+      <<: *activity
+      ROLE: finance
+    volumes:
+      - ./workstations/user-activity.sh:/app/user-activity.sh:ro
+    command: *ws_cmd
+    depends_on: [router, dns, caddy-prod, caddy-preprod]
+
+  ws4:
+    build: ./images/labtools
+    image: obserae-demo/labtools
+    container_name: ws4
+    restart: unless-stopped
+    <<: *netadmin
+    hostname: ws4-hr
+    dns: ["10.0.10.10"]
+    networks:
+      work:
+        ipv4_address: 10.0.40.14
+    environment:
+      <<: *activity
+      ROLE: hr
+    volumes:
+      - ./workstations/user-activity.sh:/app/user-activity.sh:ro
+    command: *ws_cmd
+    depends_on: [router, dns, caddy-prod, caddy-preprod]
+
+  ws5:
+    build: ./images/labtools
+    image: obserae-demo/labtools
+    container_name: ws5
+    restart: unless-stopped
+    <<: *netadmin
+    hostname: ws5-marketing
+    dns: ["10.0.10.10"]
+    networks:
+      work:
+        ipv4_address: 10.0.40.15
+    environment:
+      <<: *activity
+      ROLE: generic
+    volumes:
+      - ./workstations/user-activity.sh:/app/user-activity.sh:ro
+    command: *ws_cmd
+    depends_on: [router, dns, caddy-prod, caddy-preprod]
+
+# =============================================================================
+#  VOLUMES
+# =============================================================================
+volumes:
+  obserae-data:
+  freeipa-data:
+
+# =============================================================================
+#  NETWORKS
+# =============================================================================
+networks:
+  mgmt:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: obs-mgmt
+    ipam:
+      config:
+        - subnet: 10.0.0.0/24
+  dmz:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: obs-dmz
+    ipam:
+      config:
+        - subnet: 10.0.10.0/24
+  prod:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: obs-prod
+    ipam:
+      config:
+        - subnet: 10.0.20.0/24
+  preprod:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: obs-preprod
+    ipam:
+      config:
+        - subnet: 10.0.30.0/24
+  work:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: obs-work
+    ipam:
+      config:
+        - subnet: 10.0.40.0/24

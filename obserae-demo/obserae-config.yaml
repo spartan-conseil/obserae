@@ -1,0 +1,839 @@
+cartography:
+  networks:
+    - name: DMZ
+      cidr: 10.0.10.0/24
+    - name: PREPROD
+      cidr: 10.0.30.0/24
+    - name: PROD
+      cidr: 10.0.20.0/24
+    - name: WORK
+      cidr: 10.0.40.0/24
+  hosts:
+    - name: cf-dns01
+      interfaces:
+        - name: eth0
+          network: internet4
+          ip: 1.1.1.1
+      services:
+        - name: dns-tcp
+          protocol: TCP
+          port: 53
+          interfaces:
+            - eth0
+        - name: dns-udp
+          protocol: UDP
+          port: 53
+          interfaces:
+            - eth0
+    - name: dns
+      interfaces:
+        - name: eth0
+          network: DMZ
+          ip: 10.0.10.10
+      services:
+        - name: dns
+          protocol: UDP
+          port: 53
+          interfaces:
+            - eth0
+    - name: docker-SSDP
+      interfaces:
+        - name: eth0
+          network: internal4
+          ip: 239.255.255.250
+      services:
+        - name: ssdp
+          protocol: UDP
+          port: 1900
+          interfaces:
+            - eth0
+    - name: docker-bridges
+      interfaces:
+        - name: eth0
+          network: DMZ
+          ip: 10.0.10.1
+        - name: eth1
+          network: PROD
+          ip: 10.0.20.1
+        - name: eth2
+          network: PREPROD
+          ip: 10.0.30.1
+        - name: eth3
+          network: WORK
+          ip: 10.0.40.1
+    - name: google-dns09
+      interfaces:
+        - name: eth0
+          network: internet4
+          ip: 9.9.9.9
+      services:
+        - name: dns-tcp
+          protocol: TCP
+          port: 53
+          interfaces:
+            - eth0
+        - name: dns-udp
+          protocol: UDP
+          port: 53
+          interfaces:
+            - eth0
+    - name: pp-backend
+      interfaces:
+        - name: eth0
+          network: PREPROD
+          ip: 10.0.30.20
+    - name: pp-caddy
+      interfaces:
+        - name: eth0
+          network: PREPROD
+          ip: 10.0.30.10
+      services:
+        - name: https
+          protocol: TCP
+          port: 443
+          interfaces:
+            - eth0
+    - name: pp-db
+      interfaces:
+        - name: eth0
+          network: PREPROD
+          ip: 10.0.30.30
+      services:
+        - name: postgres
+          protocol: TCP
+          port: 5432
+          interfaces:
+            - eth0
+    - name: prod-backend
+      interfaces:
+        - name: eth0
+          network: PROD
+          ip: 10.0.20.20
+    - name: prod-caddy
+      interfaces:
+        - name: eth0
+          network: PROD
+          ip: 10.0.20.10
+      services:
+        - name: http
+          protocol: TCP
+          port: 80
+          interfaces:
+            - eth0
+        - name: https
+          protocol: TCP
+          port: 443
+          interfaces:
+            - eth0
+        - name: postgres
+          protocol: TCP
+          port: 5432
+          interfaces:
+            - eth0
+        - name: ssh
+          protocol: TCP
+          port: 22
+          interfaces:
+            - eth0
+    - name: prod-db
+      interfaces:
+        - name: eth0
+          network: PROD
+          ip: 10.0.20.30
+      services:
+        - name: postgres
+          protocol: TCP
+          port: 5432
+          interfaces:
+            - eth0
+    - name: router
+      interfaces:
+        - name: eth0
+          network: DMZ
+          ip: 10.0.10.2
+        - name: eth1
+          network: PROD
+          ip: 10.0.20.2
+        - name: eth2
+          network: PREPROD
+          ip: 10.0.30.2
+        - name: eth3
+          network: WORK
+          ip: 10.0.40.2
+      services:
+        - name: http
+          protocol: TCP
+          port: 80
+          interfaces:
+            - eth1
+        - name: https
+          protocol: TCP
+          port: 443
+          interfaces:
+            - eth1
+        - name: postgres
+          protocol: TCP
+          port: 5432
+          interfaces:
+            - eth1
+        - name: ssh
+          protocol: TCP
+          port: 22
+          interfaces:
+            - eth1
+    - name: ws1-dev
+      interfaces:
+        - name: eth0
+          network: WORK
+          ip: 10.0.40.11
+    - name: ws2-ops
+      interfaces:
+        - name: eth0
+          network: WORK
+          ip: 10.0.40.12
+    - name: ws3-finance
+      interfaces:
+        - name: eth0
+          network: WORK
+          ip: 10.0.40.13
+    - name: ws4-hr
+      interfaces:
+        - name: eth0
+          network: WORK
+          ip: 10.0.40.14
+    - name: ws5-mkt
+      interfaces:
+        - name: eth0
+          network: WORK
+          ip: 10.0.40.15
+  groups:
+    - name: pp-grp
+      members:
+        - pp-backend
+        - pp-caddy
+        - pp-db
+    - name: prod-grp
+      members:
+        - prod-backend
+        - prod-caddy
+        - prod-db
+    - name: public-dns-grp
+      members:
+        - cf-dns01
+        - google-dns09
+    - name: work-grp
+      members:
+        - ws1-dev
+        - ws2-ops
+        - ws3-finance
+        - ws4-hr
+        - ws5-mkt
+  layout:
+    - kind: group
+      name: pp-grp
+      x: 0
+      "y": 0
+      color: '#2563EB'
+    - kind: group
+      name: prod-grp
+      x: 800
+      "y": 460
+    - kind: group
+      name: public-dns-grp
+      x: 1440
+      "y": 460
+    - kind: group
+      name: work-grp
+      x: 0
+      "y": 0
+      color: '#475569'
+    - kind: host
+      name: cf-dns01
+      x: -1720
+      "y": 560
+      pinned: true
+      color: '#EAB308'
+      icon: mdi:server
+      os_icon: devicon:debian
+    - kind: host
+      name: dns
+      x: 560
+      "y": -320
+      pinned: true
+      color: '#DB2777'
+      icon: mdi:dns
+      os_icon: devicon:raspberrypi
+    - kind: host
+      name: docker-SSDP
+      x: -520
+      "y": 1020
+      pinned: true
+      icon: mdi:server-off
+    - kind: host
+      name: docker-bridges
+      x: -520
+      "y": 1280
+      pinned: true
+      color: '#7C3AED'
+      icon: mdi:server-off
+    - kind: host
+      name: google-dns09
+      x: -1720
+      "y": 780
+      pinned: true
+      color: '#EAB308'
+      icon: mdi:server
+      os_icon: devicon:debian
+    - kind: host
+      name: pp-backend
+      x: 560
+      "y": 620
+      pinned: true
+      color: '#5A6088'
+    - kind: host
+      name: pp-caddy
+      x: 560
+      "y": 500
+      pinned: true
+      color: '#F7D154'
+    - kind: host
+      name: pp-db
+      x: 560
+      "y": 760
+      pinned: true
+      color: '#F97316'
+    - kind: host
+      name: prod-backend
+      x: 560
+      "y": 80
+      pinned: true
+      color: '#5A6088'
+    - kind: host
+      name: prod-caddy
+      x: 560
+      "y": -80
+      pinned: true
+      color: '#F7D154'
+    - kind: host
+      name: prod-db
+      x: 560
+      "y": 200
+      pinned: true
+    - kind: host
+      name: router
+      x: -520
+      "y": 580
+      pinned: true
+      color: '#DB2777'
+    - kind: host
+      name: ws1-dev
+      x: 560
+      "y": 1020
+      pinned: true
+      color: '#0D9488'
+    - kind: host
+      name: ws2-ops
+      x: 560
+      "y": 1140
+      pinned: true
+      color: '#FF4D7E'
+    - kind: host
+      name: ws3-finance
+      x: 560
+      "y": 1260
+      pinned: true
+      color: '#7C3AED'
+    - kind: host
+      name: ws4-hr
+      x: 560
+      "y": 1380
+      pinned: true
+      color: '#0D9488'
+    - kind: host
+      name: ws5-mkt
+      x: 560
+      "y": 1520
+      pinned: true
+      color: '#7FD66B'
+    - kind: network
+      name: DMZ
+      x: 180
+      "y": -320
+      pinned: true
+    - kind: network
+      name: PREPROD
+      x: 160
+      "y": 620
+      pinned: true
+    - kind: network
+      name: PROD
+      x: 160
+      "y": 40
+      pinned: true
+    - kind: network
+      name: WORK
+      x: 180
+      "y": 1260
+      pinned: true
+flow_matrix:
+  rules:
+    - name: db-pp-backent-to-db
+      src: host:pp-backend
+      src_service: '*'
+      dst: host:pp-db
+      dst_service: postgres
+      protocol: TCP
+      enabled: true
+      tags:
+        - postgres
+        - pp
+    - name: db-prod-backent-to-db
+      src: host:prod-backend
+      src_service: '*'
+      dst: host:prod-db
+      dst_service: postgres
+      protocol: TCP
+      enabled: true
+      tags:
+        - postgres
+        - prod
+    - name: dns-dmz-to-cloudflare-tcp
+      src: host:dns
+      src_service: '*'
+      dst: group:public-dns-grp
+      dst_service: dns-tcp
+      protocol: TCP
+      enabled: true
+      tags:
+        - dns
+    - name: dns-dmz-to-cloudflare-udp
+      src: host:dns
+      src_service: '*'
+      dst: group:public-dns-grp
+      dst_service: dns-udp
+      protocol: UDP
+      enabled: true
+      tags:
+        - dns
+    - name: dns-work-to-dmz
+      src: group:work-grp
+      src_service: '*'
+      dst: host:dns
+      dst_service: dns
+      protocol: UDP
+      enabled: true
+      tags:
+        - dns
+    - name: docker-ssdp
+      src: host:docker-bridges
+      src_service: '*'
+      dst: host:docker-SSDP
+      dst_service: ssdp
+      protocol: UDP
+      enabled: true
+      tags:
+        - docker
+        - internal
+    - name: http-pp-caddy-to-backend
+      src: host:pp-caddy
+      src_service: '*'
+      dst: host:pp-backend
+      dst_service: 8000/TCP
+      protocol: TCP
+      enabled: true
+      tags:
+        - backend
+        - pp
+    - name: http-prod-caddy-to-backend
+      src: host:prod-caddy
+      src_service: '*'
+      dst: host:prod-backend
+      dst_service: 8000/TCP
+      protocol: TCP
+      enabled: true
+      tags:
+        - backend
+        - prod
+    - name: https-work-to-internet4-443
+      src: group:work-grp
+      src_service: '*'
+      dst: internet4
+      dst_service: 443/TCP
+      protocol: TCP
+      enabled: true
+      tags:
+        - https
+        - internet
+        - work
+    - name: https-work-to-preprod
+      src: group:work-grp
+      src_service: '*'
+      dst: host:pp-caddy
+      dst_service: https
+      protocol: TCP
+      enabled: true
+      tags:
+        - https
+        - pp
+    - name: https-work-to-prod
+      src: group:work-grp
+      src_service: '*'
+      dst: host:prod-caddy
+      dst_service: https
+      protocol: TCP
+      enabled: true
+      tags:
+        - https
+        - prod
+enrichment:
+  enabled: true
+  sources:
+    - name: asn
+      enabled: true
+    - name: aws
+      enabled: true
+    - name: azure
+      enabled: true
+    - name: cloudflare
+      enabled: true
+    - name: firehol_level1
+      enabled: true
+    - name: geoip
+      enabled: true
+    - name: google
+      enabled: true
+    - name: google_services
+      enabled: true
+    - name: oracle
+      enabled: true
+    - name: tor_exit
+      enabled: true
+    - name: tor_relays
+      enabled: true
+exporters:
+  - ip: 10.0.0.1
+    name: Local
+    equipment_type: softflow
+backup:
+  enabled: false
+  directory: /var/lib/obserae/backups
+  full_at: "03:00"
+  delta_interval: 1h0m0s
+  max_full_age: 720h0m0s
+  max_full_files: 0
+  max_age: 168h0m0s
+  max_files: 0
+retention:
+  enabled: true
+  flows_max_age: 720h0m0s
+  sessions_max_age: 2160h0m0s
+  auditlog_max_age: 0s
+  batch_size: 50000
+users:
+  users:
+    - username: admin
+      display_name: Administrator
+      password_hash: $argon2id$v=19$m=65536,t=3,p=2$8BML/y7JeJa8fN6izE5iYg$If/E6TaWg+7qxvefgL5UPc2QZRoXbCL9nwtPzc3BPOo
+      active: true
+      builtin: true
+      groups:
+        - admin
+    - username: alice
+      display_name: Alice Martin
+      password_hash: $argon2id$v=19$m=65536,t=3,p=2$DJC1OM8wh57SxUO8kWh+wA$tgVjEhPMCjDMSUQl9C0mHLfdqUa0h6DjcXIMjMYYglI
+      active: true
+      groups:
+        - admin
+    - username: bob
+      display_name: Bob Durand
+      password_hash: $argon2id$v=19$m=65536,t=3,p=2$fTq5BOp3GLWo/FEV86/org$/Yjz21UMB4oumcNVbAY/YA4QVPYqegMZfLTy21SOMAE
+      active: true
+      groups:
+        - analyst
+  ldap:
+    enabled: true
+    url: ldaps://ipa.corp.lan:636
+    root_ca: |-
+      -----BEGIN CERTIFICATE-----
+      MIIERDCCAqygAwIBAgIBATANBgkqhkiG9w0BAQsFADAzMREwDwYDVQQKDAhDT1JQ
+      LkxBTjEeMBwGA1UEAwwVQ2VydGlmaWNhdGUgQXV0aG9yaXR5MB4XDTI2MDcwNTE1
+      NDczMVoXDTQ2MDcwNTE1NDczMVowMzERMA8GA1UECgwIQ09SUC5MQU4xHjAcBgNV
+      BAMMFUNlcnRpZmljYXRlIEF1dGhvcml0eTCCAaIwDQYJKoZIhvcNAQEBBQADggGP
+      ADCCAYoCggGBAKO0lvaBikbU2X6Ghvpo8szcIv7Ba7ZP5p6hD7Pcz2xcKc8Nmk2W
+      m1YRawdMW8aiEuaGE1giGpmNp7R2FL2Lutl9BCHeFmOuqvzp255hyXDONLFikkI/
+      1Z23xhlx0yIo03nxHhWQh/uujLfVubdBdu8zeZzUhatTQGjBO38LAuFkD2sfQJLA
+      e9rv0hcKLm7JpAjDemsGmHB33xr6RldsYeWhdCjxTJkTsafiIAm6MVgFms4GDPgX
+      2j2onvSKPnB8FyxzTKsE+5/Kcv0Rd+d3Sh85lfCm1+obfLuBx822IvzvJEhb5kLs
+      P4ox6xzp8/rA8kbqp/U4CDNHCjH0NxcvSHSqFal5RqAadsUTHcVKwL3pQqUis5DO
+      VcO9LR2WJgPDUrzm+QUZiLdGzOIgBIMNgCK1wcloYtTmbT79yGriG+dhM2gHlpPb
+      mc9EPtNILCr52i1JD2XbjY4kxW7TziTeBNi28snyHNNRhJx7X8m/6XnFRQz3fWCd
+      /9wJxuhSIczaGwIDAQABo2MwYTAdBgNVHQ4EFgQUCk9amCndMkPZOhGmraSCuHhq
+      fqswHwYDVR0jBBgwFoAUCk9amCndMkPZOhGmraSCuHhqfqswDwYDVR0TAQH/BAUw
+      AwEB/zAOBgNVHQ8BAf8EBAMCAcYwDQYJKoZIhvcNAQELBQADggGBADbVo6PtjgbQ
+      2xaHkyblkxk1E2SylvEkYFRnGWfcG7giY/g/N+8FBYWPkAcE8GKRi399edgEjX83
+      7Wc8pr/nrx8Eu3/2J2pq6ICSs+uFJN8xJ5Jf9qvrJ0+fAhj7jkmu/VmRfR53TpJQ
+      b8HuPVUDNGUXXoiK1OBKAJDIxMz+eRw5ilWS0IxxtEjXDMn4fwidvtxgtylOE9po
+      oUizgWZ+L6ngH0hBei6+SLPcgWQ5xuBg0PCWu2WNJrzdZBw42YhkgvJAzMAmGWo2
+      K64b+Mpey/jhYcEvIkN1YIvXxk6pxRD31xYBQlclHVD6efrXQlBmF1t/AF14oczx
+      7BfFgLg2d4OPBVptYh+RD+PA933O4qrPOxU9X+ZTzEfKncpyvFp2I9TnasuJKlaK
+      F6UPHYlNxpr7we11pb7WQ0K1PQuUgQ/lDuEGkaAx+0Xi3zWKG4qsq2vsq158S4CY
+      L8D8RYCi/tr+of+DshVTDisutLGPAc2KiqhNAcI4BjUm05Mvn6+8NA==
+      -----END CERTIFICATE-----
+    bind_dn: uid=svc-obserae,cn=sysaccounts,cn=etc,dc=corp,dc=lan
+    bind_password: enc:v1:mzDm5Cs4h1EIEN1JcD6ouG2V5Zs1ayDRqqdmZ14yQqgkpYw92XwW
+    user_base_dn: cn=users,cn=accounts,dc=corp,dc=lan
+    user_filter: (uid=%s)
+    username_attr: uid
+    display_name_attr: displayName
+    group_base_dn: cn=groups,cn=accounts,dc=corp,dc=lan
+    groups:
+      - ldap_group: obserae-admins
+        obserae_group: admin
+      - ldap_group: obserae-analysts
+        obserae_group: analyst
+      - ldap_group: obserae-auditors
+        obserae_group: auditor
+rule_sets:
+  packs:
+    - id: std.anomaly
+      version: 0.5.0
+      enabled: true
+      rules:
+        - rule: std.anomaly.adaptive-exfiltration
+          enabled: true
+        - rule: std.anomaly.auth-brute-force
+          enabled: true
+        - rule: std.anomaly.dns-exfiltration
+          enabled: true
+        - rule: std.anomaly.egress-fanout
+          enabled: true
+        - rule: std.anomaly.half-open-surge
+          enabled: true
+        - rule: std.anomaly.host-sweep-horizontal
+          enabled: true
+        - rule: std.anomaly.lateral-admin-surge
+          enabled: true
+        - rule: std.anomaly.lateral-spread
+          enabled: true
+        - rule: std.anomaly.port-scan-vertical
+          enabled: true
+    - id: std.community
+      version: 0.4.0
+      enabled: true
+      rules:
+        - rule: std.community.cleartext-ldap
+          enabled: true
+        - rule: std.community.container-overlay-from-internet
+          enabled: true
+        - rule: std.community.database-exposed-to-internet
+          enabled: true
+        - rule: std.community.dns-tunneling-volume
+          enabled: true
+        - rule: std.community.external-horizontal-tcp-scan
+          enabled: true
+        - rule: std.community.file-transfer-service-exposed-to-internet
+          enabled: true
+        - rule: std.community.firehol-level1-egress-high-volume
+          enabled: true
+        - rule: std.community.flow-telemetry-stopped
+          enabled: true
+        - rule: std.community.ftp-in-use
+          enabled: true
+        - rule: std.community.guest-dns-to-internet
+          enabled: true
+        - rule: std.community.guest-to-remote-admin
+          enabled: true
+        - rule: std.community.guest-to-smb
+          enabled: true
+        - rule: std.community.high-volume-internet-egress
+          enabled: true
+        - rule: std.community.hypervisor-management-exposed-to-internet
+          enabled: true
+        - rule: std.community.icmp-high-volume-egress
+          enabled: true
+        - rule: std.community.imap-on-143-observed
+          enabled: true
+        - rule: std.community.internal-horizontal-tcp-scan
+          enabled: true
+        - rule: std.community.internal-vertical-tcp-scan
+          enabled: true
+        - rule: std.community.iot-dns-to-internet
+          enabled: true
+        - rule: std.community.iot-internet-connection-burst
+          enabled: true
+        - rule: std.community.iot-to-database
+          enabled: true
+        - rule: std.community.iot-to-remote-admin
+          enabled: true
+        - rule: std.community.ipmi-exposed-to-internet
+          enabled: true
+        - rule: std.community.irc-egress-to-internet
+          enabled: true
+        - rule: std.community.known-threat-ip-egress
+          enabled: true
+        - rule: std.community.netbios-to-internet
+          enabled: true
+        - rule: std.community.new-internet-exposed-service
+          enabled: true
+        - rule: std.community.pop3-on-110-observed
+          enabled: true
+        - rule: std.community.pptp-in-use
+          enabled: true
+        - rule: std.community.rdp-connection-burst
+          enabled: true
+        - rule: std.community.rdp-exposed-to-internet
+          enabled: true
+        - rule: std.community.rogue-dhcp-server-on-untrusted-zone
+          enabled: true
+        - rule: std.community.smb-to-internet
+          enabled: true
+        - rule: std.community.snmp-cleartext
+          enabled: true
+        - rule: std.community.ssh-bruteforce-or-scan
+          enabled: true
+        - rule: std.community.ssh-exposed-to-internet
+          enabled: true
+        - rule: std.community.syslog-without-tls-observed
+          enabled: true
+        - rule: std.community.telnet-in-use
+          enabled: true
+        - rule: std.community.tftp-in-use
+          enabled: true
+        - rule: std.community.tor-control-port-observed
+          enabled: true
+        - rule: std.community.tor-socks-proxy-observed
+          enabled: true
+        - rule: std.community.udp-amplification-service-exposed-to-internet
+          enabled: true
+        - rule: std.community.unauthenticated-docker-engine-in-use
+          enabled: true
+        - rule: std.community.user-to-remote-admin
+          enabled: true
+        - rule: std.community.vnc-exposed-to-internet
+          enabled: true
+        - rule: std.community.winrm-exposed-to-internet
+          enabled: true
+        - rule: std.community.workstation-dns-to-internet
+          enabled: true
+        - rule: std.community.workstation-encrypted-dns-to-internet
+          enabled: true
+        - rule: std.community.workstation-smtp-to-internet
+          enabled: true
+        - rule: std.community.x11-in-use
+          enabled: true
+    - id: std.enterprise
+      version: 0.4.0
+      enabled: true
+      rules:
+        - rule: std.enterprise.asymmetric-upload-to-internet
+          enabled: true
+        - rule: std.enterprise.backup-flows-stopped
+          enabled: true
+        - rule: std.enterprise.backup-zone-access-from-unexpected-zone
+          enabled: true
+        - rule: std.enterprise.backup-zone-to-internet
+          enabled: true
+        - rule: std.enterprise.database-new-client
+          enabled: true
+        - rule: std.enterprise.development-to-production-database
+          enabled: true
+        - rule: std.enterprise.development-to-production-remote-admin
+          enabled: true
+        - rule: std.enterprise.directory-service-exposed-to-internet
+          enabled: true
+        - rule: std.enterprise.docker-api-exposed-to-internet
+          enabled: true
+        - rule: std.enterprise.docker-swarm-control-exposed-to-internet
+          enabled: true
+        - rule: std.enterprise.domain-controller-to-internet
+          enabled: true
+        - rule: std.enterprise.etcd-access-from-non-control-plane
+          enabled: true
+        - rule: std.enterprise.etcd-exposed-to-internet
+          enabled: true
+        - rule: std.enterprise.firehol-level1-ingress-to-sensitive-service
+          enabled: true
+        - rule: std.enterprise.guest-to-database
+          enabled: true
+        - rule: std.enterprise.guest-to-directory-services
+          enabled: true
+        - rule: std.enterprise.high-volume-database-egress-to-public-cloud
+          enabled: true
+        - rule: std.enterprise.high-volume-egress-to-partner-zone
+          enabled: true
+        - rule: std.enterprise.iot-or-user-to-ot-protocol
+          enabled: true
+        - rule: std.enterprise.iot-to-directory-services
+          enabled: true
+        - rule: std.enterprise.kubelet-exposed-to-internet
+          enabled: true
+        - rule: std.enterprise.kubernetes-api-exposed-to-internet
+          enabled: true
+        - rule: std.enterprise.log-forwarding-stopped
+          enabled: true
+        - rule: std.enterprise.message-broker-exposed-to-internet
+          enabled: true
+        - rule: std.enterprise.metrics-or-admin-ui-exposed-to-internet
+          enabled: true
+        - rule: std.enterprise.netflow-or-ipfix-to-internet
+          enabled: true
+        - rule: std.enterprise.network-device-management-outside-management-zone
+          enabled: true
+        - rule: std.enterprise.new-country-for-server-egress
+          enabled: true
+        - rule: std.enterprise.non-mail-server-smtp-egress
+          enabled: true
+        - rule: std.enterprise.non-management-to-management-remote-admin
+          enabled: true
+        - rule: std.enterprise.non-management-to-ot-remote-admin
+          enabled: true
+        - rule: std.enterprise.ot-protocol-to-internet
+          enabled: true
+        - rule: std.enterprise.ot-service-exposed-to-internet
+          enabled: true
+        - rule: std.enterprise.ot-to-public-cloud
+          enabled: true
+        - rule: std.enterprise.partner-to-sensitive-service
+          enabled: true
+        - rule: std.enterprise.partner-traffic-outside-declared-paths
+          enabled: true
+        - rule: std.enterprise.periodic-uniform-egress-beaconing
+          enabled: true
+        - rule: std.enterprise.printer-to-internet
+          enabled: true
+        - rule: std.enterprise.rdp-from-user-to-server
+          enabled: true
+        - rule: std.enterprise.remote-access-tool-egress
+          enabled: true
+        - rule: std.enterprise.remote-admin-fanout
+          enabled: true
+        - rule: std.enterprise.server-ntp-to-internet
+          enabled: true
+        - rule: std.enterprise.server-zone-new-internet-destination
+          enabled: true
+        - rule: std.enterprise.smb-fanout
+          enabled: true
+        - rule: std.enterprise.ssh-to-server-not-via-bastion
+          enabled: true
+        - rule: std.enterprise.syslog-egress-to-internet
+          enabled: true
+        - rule: std.enterprise.test-to-production-database
+          enabled: true
+        - rule: std.enterprise.tor-exit-to-sensitive-internal-service
+          enabled: true
+        - rule: std.enterprise.tor-relay-egress
+          enabled: true
+        - rule: std.enterprise.unauthorized-vpn-tunnel-egress
+          enabled: true
+        - rule: std.enterprise.user-to-data-store
+          enabled: true
+        - rule: std.enterprise.user-to-kubernetes-control-plane
+          enabled: true
+        - rule: std.enterprise.vpn-zone-to-ot
+          enabled: true
+        - rule: std.enterprise.workstation-high-upload-to-internet
+          enabled: true
+        - rule: std.enterprise.workstation-to-workstation-remote-admin
+          enabled: true
+        - rule: std.enterprise.workstation-to-workstation-smb
+          enabled: true

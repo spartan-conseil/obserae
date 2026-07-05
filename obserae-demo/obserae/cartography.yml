@@ -1,0 +1,194 @@
+# =============================================================================
+#  obserae cartography for the demo lab
+# -----------------------------------------------------------------------------
+#  Import it once obserae is running and flows are arriving:
+#
+#    # via the CLI (inside the container)
+#    docker compose exec obserae obserae-cli --socket /var/lib/obserae/run/obserae.sock config validate /cartography.yml
+#    docker compose exec obserae obserae-cli --socket /var/lib/obserae/run/obserae.sock config import   /cartography.yml
+#
+#  (bind-mount this file into the obserae container, or drop it onto the GUI
+#   "Data" / "Config I/O" page).
+#
+#  After import, every rule and NFQL query can refer to assets by name
+#  (host:db-prod, group:workstations, network:prod, internet4, ...).
+# =============================================================================
+
+networks:
+  - name: "mgmt"
+    cidr: "10.0.0.0/24"
+    description: "Management -- obserae collector"
+  - name: "dmz"
+    cidr: "10.0.10.0/24"
+    description: "DMZ -- internal DNS"
+  - name: "prod"
+    cidr: "10.0.20.0/24"
+    description: "Production"
+  - name: "preprod"
+    cidr: "10.0.30.0/24"
+    description: "Pre-production"
+  - name: "work"
+    cidr: "10.0.40.0/24"
+    description: "Workstations"
+
+hosts:
+  # ---- Management ----------------------------------------------------------
+  - name: "obserae"
+    interfaces:
+      - name: "eth0"
+        network: "mgmt"
+        ip: "10.0.0.10"
+      # Second leg into the DMZ, used to reach FreeIPA for LDAP authentication.
+      - name: "eth1"
+        network: "dmz"
+        ip: "10.0.10.5"
+    services:
+      - name: "web"
+        protocol: TCP
+        port: 8080
+
+  # ---- Router / firewall (multi-homed) -------------------------------------
+  - name: "router"
+    interfaces:
+      - name: "dmz"
+        network: "dmz"
+        ip: "10.0.10.2"
+      - name: "prod"
+        network: "prod"
+        ip: "10.0.20.2"
+      - name: "preprod"
+        network: "preprod"
+        ip: "10.0.30.2"
+      - name: "work"
+        network: "work"
+        ip: "10.0.40.2"
+
+  # ---- DMZ -----------------------------------------------------------------
+  - name: "dns"
+    interfaces:
+      - name: "eth0"
+        network: "dmz"
+        ip: "10.0.10.10"
+    services:
+      - name: "dns"
+        protocol: UDP
+        port: 53
+  - name: "ipa"
+    interfaces:
+      - name: "eth0"
+        network: "dmz"
+        ip: "10.0.10.20"
+    services:
+      - name: "ldap"
+        protocol: TCP
+        port: 389
+      - name: "ldaps"
+        protocol: TCP
+        port: 636
+        description: "obserae LDAP authentication"
+      - name: "kerberos"
+        protocol: TCP
+        port: 88
+      - name: "https"
+        protocol: TCP
+        port: 443
+
+  # ---- Production ----------------------------------------------------------
+  - name: "caddy-prod"
+    interfaces:
+      - name: "eth0"
+        network: "prod"
+        ip: "10.0.20.10"
+    services:
+      - name: "https"
+        protocol: TCP
+        port: 443
+  - name: "backend-prod"
+    interfaces:
+      - name: "eth0"
+        network: "prod"
+        ip: "10.0.20.20"
+    services:
+      - name: "http"
+        protocol: TCP
+        port: 8000
+  - name: "db-prod"
+    interfaces:
+      - name: "eth0"
+        network: "prod"
+        ip: "10.0.20.30"
+    services:
+      - name: "postgres"
+        protocol: TCP
+        port: 5432
+        description: "Primary"
+
+  # ---- Pre-production ------------------------------------------------------
+  - name: "caddy-preprod"
+    interfaces:
+      - name: "eth0"
+        network: "preprod"
+        ip: "10.0.30.10"
+    services:
+      - name: "https"
+        protocol: TCP
+        port: 443
+  - name: "backend-preprod"
+    interfaces:
+      - name: "eth0"
+        network: "preprod"
+        ip: "10.0.30.20"
+    services:
+      - name: "http"
+        protocol: TCP
+        port: 8000
+  - name: "db-preprod"
+    interfaces:
+      - name: "eth0"
+        network: "preprod"
+        ip: "10.0.30.30"
+    services:
+      - name: "postgres"
+        protocol: TCP
+        port: 5432
+
+  # ---- Workstations --------------------------------------------------------
+  - name: "ws1-dev"
+    interfaces:
+      - name: "eth0"
+        network: "work"
+        ip: "10.0.40.11"
+  - name: "ws2-ops"
+    interfaces:
+      - name: "eth0"
+        network: "work"
+        ip: "10.0.40.12"
+  - name: "ws3-finance"
+    interfaces:
+      - name: "eth0"
+        network: "work"
+        ip: "10.0.40.13"
+  - name: "ws4-hr"
+    interfaces:
+      - name: "eth0"
+        network: "work"
+        ip: "10.0.40.14"
+  - name: "ws5-marketing"
+    interfaces:
+      - name: "eth0"
+        network: "work"
+        ip: "10.0.40.15"
+
+groups:
+  - name: "web-frontends"
+    members: ["caddy-prod", "caddy-preprod"]
+  - name: "databases"
+    members: ["db-prod", "db-preprod"]
+  - name: "production"
+    members: ["caddy-prod", "backend-prod", "db-prod"]
+  - name: "preproduction"
+    members: ["caddy-preprod", "backend-preprod", "db-preprod"]
+  - name: "workstations"
+    members: ["ws1-dev", "ws2-ops", "ws3-finance", "ws4-hr", "ws5-marketing"]
+  - name: "identity"
+    members: ["ipa"]

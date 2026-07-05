@@ -7,6 +7,45 @@ credible technical demo of obserae without any network hardware.
 
 ---
 
+## Quick start (one command)
+
+On a Linux host with Docker + Compose v2, deploy the whole lab in a single
+command:
+
+```bash
+curl -fsSL https://demo.obserae.com | sh
+```
+
+The installer downloads the demo files from GitHub, builds the images and starts
+the stack in `./obserae-demo`, then prints the next steps. Open the UI at
+**http://127.0.0.1:8081** (login `admin` / `admin`) and give it 2–5 minutes for
+the first NetFlow templates to arrive.
+
+The same script doubles as a lifecycle tool — pass a command (and options) after
+`-s --`:
+
+```bash
+# also demo LDAP sign-in (FreeIPA, slower first boot)
+curl -fsSL https://demo.obserae.com | sh -s -- --with-ldap
+
+# follow logs / check status / tear everything down (volumes included)
+curl -fsSL https://demo.obserae.com | sh -s -- logs sensor
+curl -fsSL https://demo.obserae.com | sh -s -- status
+curl -fsSL https://demo.obserae.com | sh -s -- uninstall --yes
+```
+
+Prefer to read the script first? `curl -fsSL https://demo.obserae.com -o install.sh`,
+inspect it, then `sh install.sh`. Useful options: `--dir <path>` (default
+`./obserae-demo`), `--ref <branch|tag>`, `--no-start` (fetch + validate the
+compose file only). It just automates the manual steps in §3.
+
+> The installer starts the stack **empty**: it does not import the ready-made
+> configuration (§4 shows the one-liner for that) and leaves FreeIPA off until
+> you pass `--with-ldap`. The rest of this README is the manual, step-by-step
+> path and explains what each piece does.
+
+---
+
 ## 1. Topology
 
 ```
@@ -96,6 +135,12 @@ docker compose down          # keeps images and the obserae-data volume
 docker compose down -v       # + removes volumes (obserae DB and Postgres data)
 ```
 
+> **FreeIPA is not started by default.** It sits behind the `ldap` compose
+> profile (its first boot is heavy — systemd + a CA), so a plain
+> `docker compose up -d` brings up everything *except* FreeIPA. Start it only
+> when you want to demo LDAP sign-in — see §5, or use the installer's
+> `--with-ldap`.
+
 ---
 
 ## 4. Load the ready-to-use configuration
@@ -154,8 +199,9 @@ second interface on the `dmz` network (`10.0.10.5`) so it can reach FreeIPA
 directly over **LDAPS**.
 
 ```bash
-# 1. Bring the stack up and let FreeIPA finish its (slow) first boot.
-docker compose up -d
+# 1. Bring the stack up WITH the ldap profile so FreeIPA starts, and let its
+#    (slow) first boot finish. (The installer does this for you: --with-ldap.)
+docker compose --profile ldap up -d
 docker compose logs -f freeipa      # wait for "FreeIPA server configured"
 
 # 2. Provision the directory and point obserae at it (idempotent).
@@ -314,6 +360,8 @@ Tip: lower `ACTIVITY_MIN_SLEEP` / `ACTIVITY_MAX_SLEEP` in `.env` then
 
 ```
 obserae-demo/
+├── install.sh                 # one-command installer (also on demo.obserae.com); fetches these files
+├── manifest.txt               # list of files install.sh downloads (single source of truth)
 ├── docker-compose.yml         # full infrastructure
 ├── .env                       # optional: create to override defaults (obserae image, activity intensity)
 ├── images/

@@ -145,6 +145,12 @@ services:
     image: freeipa/freeipa-server:rocky-9
     container_name: freeipa
     hostname: ipa.corp.lan
+    # FreeIPA is heavy (systemd + a CA provisioned on first boot, several minutes)
+    # and only needed to demo LDAP sign-in. Put it behind the "ldap" profile so the
+    # default `docker compose up` stays light; start it with `--profile ldap`
+    # (install.sh does this for you when passed --with-ldap). Nothing else
+    # depends_on freeipa, so excluding it has no side effect on the rest of the lab.
+    profiles: ["ldap"]
     restart: unless-stopped
     dns: ["10.0.10.10"]
     networks:

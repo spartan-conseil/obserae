@@ -6,6 +6,202 @@ dates; binaries and Docker images for each version are on the
 [releases page](https://github.com/spartan-conseil/obserae/releases). This is a
 bird's-eye view, not an exhaustive commit log.
 
+## [0.27.0] — 2026-07-05
+
+- **Fix — the Anomaly Detection chart modal is padded like every other modal.**
+  The large time-series chart modal (`.modal__panel--chart`) had no inner
+  padding, so the title, the window/scale toggles and the legend ran flush to
+  the panel edges and looked about to overflow. It now carries the standard
+  16px/24px breathing room.
+
+- **Fix — ruleset-owned anomaly rules are read-only, like on the Rules page.**
+  The Anomaly Detection page let you open the Edit form on a rule provided by a
+  rule set (e.g. `std.anomaly.adaptive-exfiltration`); saving failed with a red
+  *internal server error*. Pack-owned anomaly rules are now read-only in the
+  drawer — the Edit button and baseline-method switch are hidden, a **Duplicate**
+  action and a "provided by rule set … — read-only" note appear instead (and a
+  `pack` badge in the list), exactly like the deterministic Rules page. Editing a
+  pack-owned rule server-side now returns a clean **403** with the help text
+  instead of a 500. Migration-free, GUI-only.
+
+- **Cartography quality-of-life.** Three editor ergonomics on the `/carto` page:
+  the **Network Discovery** and **IP Discovery** drawers gain a text box to filter
+  their rows by IP/name or CIDR/name; clicking **+ Group** with hosts selected on
+  the graph now opens the new-group form with those hosts **already ticked**; and
+  the **Delete** key removes the selected hosts and networks after an aggregated
+  cascade confirmation. Migration-free, GUI-only.
+
+- **`std.anomaly` 0.5.0 — client-correct malicious-activity detectors.** The
+  shipped anomaly detectors grouped by the canonical `ip_a` and summed `ab_bytes`,
+  but that A/B order is not the client/server orientation — so exfiltration summed
+  the wrong direction for a possibly-server endpoint. All rules now group by the
+  inferred `client_ip` and sum the true client direction. The pack grows from 3 to
+  **9** session-based detectors — adaptive exfiltration, egress fan-out, DNS
+  exfiltration, lateral spread, lateral admin surge, vertical port scan, horizontal
+  host sweep, half-open (SYN-scan) surge and auth brute force — each mapped to
+  **MITRE ATT&CK** and the **NIS2 / DORA / CIS Controls v8 / SOC 2** detection
+  obligations (carried in rule tags). The flows-based `scan-surge` is replaced by
+  the client-correct scan rules. Migration-free.
+
+- **Fix — the Install button in the Rule Sets modal is clickable again.** After a
+  clean dry-run report, the button's disabled binding returned a non-boolean
+  (`undefined` / `0`), which the framework left stuck as *disabled* — so installing
+  a healthy pack (e.g. `std.anomaly`) did nothing and the button appeared to vanish
+  on hover. It now enables for a clean report and only disables when a rule fails to
+  compile; disabled solid buttons also keep their fill on hover instead of
+  disappearing.
+
+- **NFQL `sessions` surface reoriented to client/server (breaking).** The
+  `sessions` query surface is now fully client/server oriented, mirroring
+  `sessions_consolidated`. The canonical a/b columns — `ip_a`/`ip_b`,
+  `port_a`/`port_b` and the directional `ab_*`/`ba_*` counters — are **removed from
+  NFQL** (they stay in physical storage, where they remain the folding key and
+  role-inference input). Query the client/server endpoints (`client_ip`,
+  `client_port`, `server_ip`, `server_port`) and the reoriented directional
+  counters `client_to_server_*` / `server_to_client_*` for bytes, packets, flows,
+  flags, start and end. The virtual `ip`/`port` now expand to
+  `server_ip`/`client_ip` and `server_port`/`client_port`. `SUM(client_to_server_bytes)`
+  is the correct exfiltration metric. Computed on the `sessions_correlated` view
+  (hot and archived parquet alike), NULL while the role is unknown; no data
+  migration. **Custom saved queries or alert rules that reference `ip_a`/`ab_bytes`
+  on `sessions` must move to the client/server columns** — they quarantine with a
+  clear compile error until updated. Shipped packs are unaffected.
+
+- **Homelab example bundle uses the `std.anomaly` rule set.** The example config
+  now carries the anomaly detectors as the bundled `std.anomaly` pack
+  (declared under `rule_sets`, auto-installed on import like `std.community` /
+  `std.enterprise`) instead of in-place `alerting` rules left over from the
+  removed in-page detector catalog — a shape that could strand the whole bundle,
+  since dropping the paired `… (detector)` saved queries left the rules pointing
+  at unknown queries and the config refused to import.
+
+- **NFQL `client_ip` / `client_port` on `sessions`.** The `sessions` table now
+  exposes the client endpoint as first-class, queryable columns — the side that
+  is *not* the inferred server, computed from `server_ip`. Detection rules can
+  target the requester directly (`WHERE client_ip WITHIN "10.0.0.0/8"`) instead
+  of re-deriving it from the canonical `ip_a`/`ip_b` pair (which is a stable
+  ordering, not a client/server orientation). They are NULL while the role is
+  unknown, and behave identically over hot tables or archived parquet.
+
+- **Sessions match-state toggle** (Analysis → Sessions): a new **All / Matched /
+  Unmatched** segmented switch in the filter bar re-angles the riverview against
+  the Flow Matrix — see only sessions a rule accounted for, only the ones none
+  did, or everything. It works standalone ("every unmatched session in the last
+  hour", bounded by the time window) or on top of a source/destination/port
+  scope, and deep-links via `?match=matched|unmatched`.
+
+- **NFQL fixes — pipeline chaining after `STATS` and true division.** Two
+  compiler bugs are fixed. (1) A `>` pipeline separator placed directly after
+  an expression-terminated stage — most commonly `STATS … BY <col>` — is no
+  longer mistaken for a greater-than comparison, so `… | STATS out = SUM(x) BY
+  ip > FROM … | JOIN …` chains without the `| LIMIT` workaround. (2) Division
+  `a / b` is now correctly typed as `DOUBLE` (DuckDB's `/` is *true* division,
+  fractional even for integer operands); an `EVAL ratio = a / b` no longer
+  fails at scan time with *"converting driver.Value type float64 … to a
+  int64"* and can be filtered against a decimal threshold in a later `HAVING`.
+
+- **Anomaly time-series visualisations** (Analysis → Anomaly Detection): you can
+  now *see* the anomaly, not just the fires. Clicking an entity opens a **large
+  chart modal** — the **observed metric as a line over a moving normal envelope**
+  (centre ± k·spread recomputed at every bucket) — for **every** baseline method
+  (EWMA, Median + MAD *and* Seasonal, which keeps its 24 × 7 weekly grid behind a
+  Timeline / Weekly-grid toggle). The chart reconstructs the **whole display
+  window** regardless of the rule's own live window (a rule scanning `LAST 900`
+  no longer draws a 15-minute sliver over a 24 h view), with **12 h / 24 h / 7 d**
+  presets. Deviations are **graded by severity** (warning → major → critical by
+  how far past the band they sit), the buckets that actually **paged** get a ring
+  on the line, the **warm-up** span is shaded *learning*, and a hover card spells
+  out observed / expected / bounds / z-score / status. Real zoomable axes and a
+  **Linear / Log** value-axis toggle keep a few-kB baseline and a multi-MB spike
+  both readable. A rule's **Activity heatmap** button opens a full-screen grid
+  (top entities × time, blue = below / red = above normal, fired cells outlined,
+  colour-scale legend); **click a cell to drill straight into that entity's
+  chart**. Everything is drawn with ECharts and **reconstructed on demand** —
+  obserae replays the rule's query bucketed over the display window and re-folds
+  the same estimator the engine uses, so nothing new is stored and the scan stays
+  bounded. Rules whose query can't be replayed keep the frozen-envelope band.
+
+- **Anomaly Detection page — NDR-style redesign** (Analysis → Anomaly
+  Detection): the page is now a self-contained home for **statistical** rules,
+  fully separate from the deterministic **Rules** page (the two lists never
+  mix). A **compact metrics bar** summarises the whole engine (rules active /
+  learning / off, entities tracked, fires in 24 h, a 7-day timeline and a
+  by-severity breakdown); the Rules page gains the same style of bar. Anomaly
+  rules are **authored in place** — **New anomaly rule** opens a modal on the
+  page (the same searchable query picker as the Rules page, no redirect) — and a
+  filter box searches the list. Each rule gains an **inline baseline-method
+  switch** (EWMA / Median + MAD / Seasonal), and selecting an entity draws its
+  learned baseline as a **24 × 7 seasonal heatmap** or a **mean ± k·σ band**
+  with the fires that broke it — all hand-rolled SVG, no new dependency.
+  *Known limitation:* the activity charts reflect the most recent 5000 alerts.
+- **`std.anomaly` rule set**: the three starter detectors (Adaptive
+  exfiltration, Lateral spread, Scan surge) now ship as an installable **rule
+  set** on the **Rule Sets** page, alongside `std.community`/`std.enterprise`,
+  instead of an in-page catalog. Rule packs can now carry **anomaly-condition**
+  rules (metric, group-by, baseline method and knobs), validated on import like
+  any other rule.
+
+- **Anomaly Detection page** (Analysis → Anomaly Detection): a dedicated
+  screen for the statistical engine. It lists the anomaly rules with their
+  baseline method, how many entities they track and when they last fired,
+  with an on/off switch on each row; selecting a rule shows the per-entity
+  baselines it has learned (mean ± spread / window / primed time-slots, and
+  warm-up vs active) and its fires over the last 7 days. You can finally *see*
+  the engine learn — a freshly enabled rule shows entities in warm-up flipping
+  to active as traffic arrives. Creating a rule opens the editor pre-set to the
+  anomaly condition.
+
+- **Anomaly detection: seasonal (time-of-week) baseline**: a third
+  **baseline method** that learns a separate normal for each hour-of-day ×
+  day-of-week (168 slots per entity) instead of one flat average. A load
+  that is high every weekday morning — backups, a nightly job, market open —
+  is learned as normal *for that slot* and no longer alerts every morning,
+  while the same value at an unusual hour still fires. It tunes like EWMA
+  (α, k), needs a few weeks of data to prime every slot, and uses a lower
+  default entity cap since it holds more state per entity.
+
+- **Anomaly detection: robust median + MAD baseline**: an anomaly rule can
+  now pick its **baseline method** — the default **EWMA** (rolling
+  mean/variance) or **Median + MAD**, which keeps a sliding window of recent
+  values and measures normal with the median and median absolute deviation.
+  The robust option ignores outliers, so a metric that is legitimately spiky
+  now and then (a weekly backup, a batch job) no longer blunts detection: one
+  freak value neither raises the baseline nor hides the next real spike.
+  Choose the window size on the rule form; everything else (k, warm-up,
+  two-sided firing, freeze-on-fire) works the same.
+
+- **Anomaly baselines stored in Parquet, not the database** (performance):
+  the per-entity learning an anomaly rule accumulates now lives in a
+  RAM-resident store that snapshots to compact Parquet files (one per rule)
+  on a cadence and at shutdown, instead of a growing DuckDB table upserted
+  every evaluation cycle. This keeps the database file and its checkpoints
+  bounded no matter how many entities you track, takes the write off the
+  single writer connection, and reports the store's size on the Storage
+  page. A restart re-loads the baselines; a crash loses at most the most
+  recent learning (it re-learns), and alert cooldowns stay transactional so
+  you never get a duplicate alert.
+
+- **Anomaly alert condition (statistical baseline)**: a new
+  condition type alongside presence/threshold/first-seen/heartbeat. It
+  learns, per entity (group-by key), a rolling baseline of a numeric
+  metric and fires when the current value strays more than *k* standard
+  deviations from normal — in either direction. This catches behaviour
+  that has no fixed threshold: a host sending far more than *it* usually
+  does (exfiltration), or reaching far more internal peers than usual
+  (lateral movement), with no per-host tuning. It learns silently on
+  cold start, freezes its baseline when it fires so one spike can't hide
+  the next, and stays cheap (three numbers per entity, capped by
+  *Max keys* and pruned like every grouped rule). Configure *k*, the
+  adaptation speed *alpha*, and the warm-up length on the alert-rule form.
+  
+- **Behavioural NFQL aggregates** (`ENTROPY`, `MAD`, `SKEWNESS`,
+  `KURTOSIS`): `STATS` gains four statistical functions that describe the
+  *shape* of a distribution per group rather than its total. Entropy of
+  destination ports per source flags scans; entropy of destinations flags
+  lateral movement; skewness/stddev over inter-session deltas is the basis
+  of a beaconing detector — all expressible in pure NFQL. Groundwork for
+  the upcoming baseline/anomaly alert condition.
+
 ## [0.26.0] — 206-07-02
 
 - **LDAP / Active Directory sign-in (hybrid with local accounts)**: employees

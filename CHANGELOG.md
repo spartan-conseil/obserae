@@ -6,6 +6,132 @@ dates; binaries and Docker images for each version are on the
 [releases page](https://github.com/spartan-conseil/obserae/releases). This is a
 bird's-eye view, not an exhaustive commit log.
 
+## [0.28.0] — 2026-07-08
+
+- **One-line installer is now front and centre in the docs.** The
+  `curl -fsSL https://get.obserae.com | sudo sh` installer — which downloads,
+  verifies and deploys the systemd service in a single command — was buried at
+  the bottom of the install page and missing from the README entirely. It is now
+  the featured first method in the README's Quick Install and Option 1 on the
+  Installation page.
+
+- **Browser-tab favicon.** The web interface now sets the same brand icon as the
+  public website (obserae.com) as its favicon, so the browser tab shows the
+  obserae mark instead of a blank default on every page, including the sign-in
+  and two-factor screens.
+
+- **Cartography renders at a constant on-screen size on every screen.** On a
+  small or short window (a laptop, a headless capture) the map used to cram its
+  nodes together until they overlapped, while a large monitor looked clean. The
+  map now keeps a fixed on-screen density whatever the viewport: a small window
+  shows part of the map — pan to move around, zoom out to see it all — instead of
+  squashing the nodes. Node size and spacing no longer change with the window
+  size, so the topology reads the same everywhere.
+
+- **Demo installer: no more permission error when importing the config.** Run
+  via `sudo sh`, the demo files were fetched as root, so the manual
+  `masterkey import - < obserae-masterkey.txt` / `config import - < obserae-config.yaml`
+  commands failed with "permission denied" (the host-side `< file` redirect runs
+  as your normal user). The installer now hands the demo directory back to the
+  invoking user (`$SUDO_USER`) after fetching, so the import commands — and later
+  edits to `.env` or the scripts — work without root.
+
+- **Demo lab is benign by default; attacks are opt-in.** The `obserae-demo`
+  environment no longer generates malicious "drift" traffic (network scan, direct
+  DB access, external beacon) on its own — the workstations emit only normal
+  traffic, so you can build a clean cartography baseline first. The three
+  scenarios move into standalone scripts you run on demand, one at a time
+  (`scripts/attack-scan.sh`, `attack-beacon.sh`, `attack-db-access.sh`), each with
+  a configurable burst and the NFQL query to run when it finishes.
+
+- **Detection "view rule" link now routes to the right page and pre-filters it.**
+  Following the *view rule* link from an alert on the Detection page opens the
+  targeted rule's drawer and filters the list down to just that rule. It also
+  routes by rule kind: anomaly rules open the **Anomaly** page (they are managed
+  there and are absent from the alerting-rules list, which previously produced a
+  spurious "rule not found" warning), every other rule opens the **alerting-rules**
+  page. The search box is pre-filled on both.
+
+- **REST API reference + OpenAPI spec.** New docs page describing the full HTTP
+  API — Bearer-token authentication, the permission model, error shapes and every
+  `/api/…` endpoint with `curl` examples — plus a machine-readable OpenAPI 3.1
+  description (`docs-web/docs/openapi.yaml`) you can import into Postman/Insomnia
+  or render with Swagger UI / Redoc.
+
+- **OpenID Connect (OIDC / SSO) sign-in.** A third way to log in, alongside local
+  accounts and LDAP: employees sign in through an identity provider (Keycloak,
+  Authentik, Microsoft Entra ID, Google…) by browser redirect. A new **Identity &
+  Access → OIDC / SSO** page (and `obserae-cli oidc`) configures the issuer, client
+  credentials, claim names and a *provider group → obserae role* mapping; enable it
+  and a **"Sign in with …"** button appears on the login page. The flow uses PKCE
+  and validates `state`, `nonce` and the ID-token signature/audience/expiry; a
+  first login just-in-time provisions a shadow account. Policy: an identity that
+  maps to **no** role is refused (no role, no access). The built-in **admin** stays
+  a local break-glass login. The client secret is encrypted at rest and travels in
+  the Config I/O bundle as its encrypted envelope.
+
+- **Double-click to edit on the cartography.** In edit mode, double-clicking a
+  host, network or group opens its edit form directly — a shortcut for opening
+  the drawer and clicking **Edit**. Read-only double-clicks stay inert (inspect
+  only).
+
+- **Self-service password change + locked MFA disable.** On **My account**, a
+  local user can now change their own password (verifies the current one, then
+  signs every session out — you re-authenticate with the new password). And when
+  an admin makes MFA **mandatory** for someone's group, the **Disable** button on
+  their account page is greyed out and a direct disable request is refused — a
+  mandated user can no longer strip their own second factor. LDAP accounts change
+  their password in the directory, so the Password card is hidden for them.
+
+- **Local authentication hardening: MFA, rate limiting, IP allowlist.** Three
+  additions strengthen local sign-in (all local-account only; LDAP stays
+  directory-owned):
+  - **Two-factor authentication (TOTP).** Any signed-in user manages their own
+    second factor from a new **My account** page (top-bar user menu): enroll an
+    authenticator by scanning a QR code (or entering the secret), reveal
+    single-use **recovery codes** once at activation, and disable after
+    confirming a code. Login becomes two-step for MFA-enabled accounts, and
+    admins can **require** MFA globally or per RBAC group on **Identity & Access
+    → Login security** (a covered user is sent to enroll at next login). Admins
+    can **reset** a user's MFA from the Users page for the lost-device case. The
+    TOTP secret is encrypted at rest with the master key; recovery codes are hashed.
+  - **Configurable rate limiting & lockout.** Failed logins (and OTP attempts)
+    are throttled by **username and by source IP** with a temporary lockout;
+    thresholds and durations are editable on the same page and persist.
+  - **Source-IP allowlist.** Restrict where authenticated access may come from —
+    for **all** users or per **RBAC group** — enforced for browser sessions and
+    API tokens alike. A locked-out admin can clear it from the host.
+  - **New "Identity & Access" sidebar section.** Users, Groups, API tokens,
+    Login security and Authentication (LDAP) move out of *Settings* into a
+    dedicated left-menu category, each its own page (the old in-page tabs are gone).
+  - **Portable via Config I/O.** The rate-limit thresholds, IP allowlist and MFA
+    policy are exported/imported in the consolidated YAML bundle under a new
+    `login_security:` section (the policy only — never a per-user MFA secret);
+    an import applies them live, no restart.
+
+- **One-command binary install (`get.obserae.com`).** A new installer sets up
+  obserae on a bare-metal or VM Linux host in a single command:
+  `curl -fsSL https://get.obserae.com | sudo sh`. It selects the amd64/arm64
+  build of the latest release, always verifies the **SHA256 checksum** and — when
+  [`cosign`](https://docs.sigstore.dev/system_config/installation/) is present —
+  the **Sigstore keyless signature** (`--verify-provenance` also checks the SLSA
+  build provenance). Without cosign it says the binary is not signature-verified
+  and lists what to install; `--strict` makes verification mandatory. It then
+  deploys the full **systemd** service (service user, `/var/lib/obserae`,
+  `/etc/obserae/obserae.yaml`, hardened unit, enable + start). Re-run to upgrade;
+  `uninstall` (`--purge` to also drop data/config/user) to remove; `--download-only`
+  verifies a release without installing.
+
+- **One-command demo install.** The Docker-Compose demo lab (`obserae-demo/`)
+  can now be deployed with a single
+  `curl -fsSL https://demo.obserae.com | sh`. The installer fetches
+  the lab files from GitHub, builds the images and starts the stack, then prints
+  the next steps (UI, config-import one-liner). It doubles as a lifecycle tool —
+  `status` / `logs` / `update` / `uninstall` — takes `--with-ldap` to also
+  provision the FreeIPA/LDAP sign-in demo, and `--dir` / `--ref` / `--no-start`
+  for control. FreeIPA now sits behind an `ldap` compose profile, so the default
+  `docker compose up` (and the default install) stays light and fast.
+
 ## [0.27.0] — 2026-07-05
 
 - **Fix — the Anomaly Detection chart modal is padded like every other modal.**

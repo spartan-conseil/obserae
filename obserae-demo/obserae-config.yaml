@@ -257,67 +257,67 @@ cartography:
       os_icon: devicon:debian
     - kind: host
       name: dns
-      x: 560
-      "y": -320
+      x: -980
+      "y": -600
       pinned: true
       color: '#DB2777'
       icon: mdi:dns
       os_icon: devicon:raspberrypi
     - kind: host
       name: docker-SSDP
-      x: -520
-      "y": 1020
+      x: -1020
+      "y": 1340
       pinned: true
       icon: mdi:server-off
     - kind: host
       name: docker-bridges
-      x: -520
-      "y": 1280
+      x: -540
+      "y": 1340
       pinned: true
       color: '#7C3AED'
       icon: mdi:server-off
     - kind: host
       name: google-dns09
-      x: -1720
-      "y": 780
+      x: -1700
+      "y": 1000
       pinned: true
       color: '#EAB308'
       icon: mdi:server
       os_icon: devicon:debian
     - kind: host
       name: pp-backend
-      x: 560
-      "y": 620
+      x: 740
+      "y": 940
       pinned: true
       color: '#5A6088'
     - kind: host
       name: pp-caddy
-      x: 560
-      "y": 500
+      x: 740
+      "y": 620
       pinned: true
       color: '#F7D154'
     - kind: host
       name: pp-db
-      x: 560
-      "y": 760
+      x: 740
+      "y": 1280
       pinned: true
       color: '#F97316'
     - kind: host
       name: prod-backend
-      x: 560
-      "y": 80
+      x: 540
+      "y": -340
       pinned: true
       color: '#5A6088'
     - kind: host
       name: prod-caddy
-      x: 560
-      "y": -80
+      x: 540
+      "y": -640
       pinned: true
       color: '#F7D154'
     - kind: host
       name: prod-db
       x: 560
-      "y": 200
+      "y": -20
       pinned: true
     - kind: host
       name: router
@@ -327,53 +327,53 @@ cartography:
       color: '#DB2777'
     - kind: host
       name: ws1-dev
-      x: 560
-      "y": 1020
+      x: 720
+      "y": 1980
       pinned: true
       color: '#0D9488'
     - kind: host
       name: ws2-ops
-      x: 560
-      "y": 1140
+      x: 400
+      "y": 1980
       pinned: true
       color: '#FF4D7E'
     - kind: host
       name: ws3-finance
-      x: 560
-      "y": 1260
+      x: 60
+      "y": 1980
       pinned: true
       color: '#7C3AED'
     - kind: host
       name: ws4-hr
-      x: 560
-      "y": 1380
+      x: -320
+      "y": 1980
       pinned: true
       color: '#0D9488'
     - kind: host
       name: ws5-mkt
-      x: 560
-      "y": 1520
+      x: -720
+      "y": 1980
       pinned: true
       color: '#7FD66B'
     - kind: network
       name: DMZ
-      x: 180
-      "y": -320
+      x: -960
+      "y": -220
       pinned: true
     - kind: network
       name: PREPROD
-      x: 160
-      "y": 620
+      x: 340
+      "y": 940
       pinned: true
     - kind: network
       name: PROD
-      x: 160
-      "y": 40
+      x: 140
+      "y": -360
       pinned: true
     - kind: network
       name: WORK
-      x: 180
-      "y": 1260
+      x: 40
+      "y": 1420
       pinned: true
 flow_matrix:
   rules:

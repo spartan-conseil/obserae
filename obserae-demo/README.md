@@ -2,8 +2,13 @@
 
 A Docker Compose environment that simulates a **small enterprise** (DMZ,
 production, pre-production, workstations) **plus obserae** and a **NetFlow
-sensor**, with **realistic activity generated continuously**. Goal: run a
-credible technical demo of obserae without any network hardware.
+sensor**, with **realistic, benign activity generated continuously**. Goal: run
+a credible technical demo of obserae without any network hardware.
+
+The default traffic is **entirely benign** so you can build a clean baseline
+first. Malicious scenarios (network scan, direct DB access, external beacon) are
+**opt-in**: you trigger them one at a time with `scripts/attack-*.sh` (§6) and
+watch exactly what each one produces in obserae.
 
 ---
 
@@ -123,7 +128,7 @@ Check that it is alive:
 
 ```bash
 docker compose logs -f sensor        # "softflowd started on obs-work ..."
-docker compose logs -f ws1           # actions: web / dns / app / DRIFT ...
+docker compose logs -f ws1           # benign actions: web / dns / app
 docker compose logs -f dns           # resolved DNS queries
 ```
 
@@ -229,7 +234,9 @@ their roles come from FreeIPA group membership and refresh on every login.
 
 ---
 
-## 6. Flows generated (what the sensor sends to obserae)
+## 6. Flows generated & simulating an attack
+
+### Benign flows (generated continuously by default)
 
 | Type | Example flow | Origin |
 |------|--------------|--------|
@@ -240,13 +247,31 @@ their roles come from FreeIPA group membership and refresh on every login.
 | Pre-production app access | `work → preprod` TCP/443 | workstations |
 | Application chain | `caddy → backend` TCP/8000, `backend → db` TCP/5432 | reverse-proxy requests |
 | LDAP authentication | `obserae → ipa` TCP/636 (LDAPS) | user sign-in via FreeIPA |
-| **Drift: direct DB** | `work → prod/preprod` **TCP/5432** | ws-dev (east-west violation) |
-| **Drift: scan** | `work → prod` multi-port fan-out | ws-ops (`nmap`) |
-| **Drift: external beacon** | `work → 203.0.113.66 / 198.51.100.13` | ws (known-bad destinations) |
+
+### Attack flows (opt-in — you trigger them, one at a time)
+
+None of these run by default. Let the benign traffic build a baseline first,
+then run a script to generate exactly one scenario and watch obserae react. Each
+takes an optional burst `count` (default 5) and a workstation to run from:
+
+```bash
+./scripts/attack-scan.sh          # nmap scan of the PROD /28 from ws2 (ops)
+./scripts/attack-beacon.sh        # beacon to known-bad IPs from ws4 (hr)
+./scripts/attack-db-access.sh     # direct workstation → DB access from ws1 (dev)
+
+./scripts/attack-scan.sh 20 ws3   # 20 bursts, run from ws3 instead
+```
+
+| Script | Example flow | What it demonstrates |
+|--------|--------------|----------------------|
+| `attack-db-access.sh` | `work → prod/preprod` **TCP/5432** | east-west segmentation violation |
+| `attack-scan.sh` | `work → prod` multi-port fan-out (`nmap`) | reconnaissance / scan |
+| `attack-beacon.sh` | `work → 203.0.113.66 / 198.51.100.13` | known-bad destinations |
 
 The "suspicious" external IPs use **RFC 5737 documentation ranges**
 (`192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`): the SYN creates a flow to
-investigate without actually reaching anything on the internet.
+investigate without actually reaching anything on the internet. Each script
+prints the matching NFQL query to run when it finishes.
 
 ---
 
@@ -272,9 +297,14 @@ already declared in the bundle from §4, so everything else stands out — open 
 | `backend-*` | `group:databases` | PostgreSQL 5432/tcp |
 | `group:workstations` | `internet4` | HTTPS 443/tcp |
 
-**c) Investigation (NFQL) & Detection — surface the drift.** obserae's NFQL is
+**c) Trigger an attack and investigate (NFQL & Detection).** With the baseline
+in place, run one attack script (§6) and watch it stand out. obserae's NFQL is
 pipeline-style (`FROM … | WHERE …`) and understands cartography names. Examples
 to run live (adapt to the exact NFQL reference in `nfql.md`):
+
+```bash
+./scripts/attack-db-access.sh    # then run the first query below
+```
 
 ```
 # A workstation talking DIRECTLY to a database (the "postgres-present" case)
@@ -283,16 +313,17 @@ FROM sessions | WHERE src_addr == "workstations" AND dst_addr == "databases"
 # Workstations reaching the public IPv4 internet
 FROM sessions | WHERE src_addr == "workstations" AND dst_addr == "internet4"
 
-# Sessions toward our simulated known-bad ranges
+# Sessions toward our simulated known-bad ranges (after attack-beacon.sh)
 FROM sessions | WHERE dst_addr == "203.0.113.0/24"
 ```
 
-The three drift scenarios map directly onto obserae's advertised use cases:
+The three attack scenarios map directly onto obserae's advertised use cases:
 unexpected east-west (`workstations → databases`), known-bad destinations
-(beacons), and scans/volume patterns (ops workstation).
+(beacons), and scans/volume patterns. Run them one at a time to keep the signal
+clean.
 
 Tip: lower `ACTIVITY_MIN_SLEEP` / `ACTIVITY_MAX_SLEEP` in `.env` then
-`docker compose up -d` to densify the traffic for a livelier demo.
+`docker compose up -d` to densify the benign traffic for a livelier demo.
 
 ---
 
@@ -334,6 +365,12 @@ Tip: lower `ACTIVITY_MIN_SLEEP` / `ACTIVITY_MAX_SLEEP` in `.env` then
   `config import` warn about "a different master key" and leaves the LDAP bind
   password undecryptable.
 
+**`config import` / `masterkey import` fails with "permission denied".**
+- The `< obserae-*.txt/.yaml` redirect is read by your normal user; if the demo
+  files are still owned by root (an older `sudo sh` install), hand them back:
+  `sudo chown -R "$USER" obserae-demo`. The current installer does this
+  automatically after fetching.
+
 ---
 
 ## 9. Design choices & limitations
@@ -370,6 +407,9 @@ obserae-demo/
 │   └── postgres/Dockerfile     # PostgreSQL + iproute2
 ├── sensor/run-softflowd.sh     # launches one softflowd probe per bridge (NetFlow v9)
 ├── scripts/setup-ldap.sh      # provision FreeIPA + configure obserae LDAP
+├── scripts/attack-scan.sh      # opt-in: internal network scan (nmap) from a ws
+├── scripts/attack-beacon.sh    # opt-in: beacon to known-bad IPs from a ws
+├── scripts/attack-db-access.sh # opt-in: direct ws -> DB access (east-west violation)
 ├── dns/dnsmasq.conf            # internal DNS (corp.lan) + internet forwarding
 ├── freeipa/ca.crt             # exported FreeIPA CA -- generated by setup-ldap.sh
 ├── backend/app.py              # Flask backend -> PostgreSQL

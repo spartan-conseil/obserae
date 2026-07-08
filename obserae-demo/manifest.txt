@@ -20,6 +20,9 @@ images/caddy/Dockerfile
 images/postgres/Dockerfile
 sensor/run-softflowd.sh
 scripts/setup-ldap.sh
+scripts/attack-scan.sh
+scripts/attack-beacon.sh
+scripts/attack-db-access.sh
 dns/dnsmasq.conf
 caddy/Caddyfile.prod
 caddy/Caddyfile.preprod

@@ -2,14 +2,17 @@
 # =============================================================================
 #  User activity simulator (Linux workstation)
 # -----------------------------------------------------------------------------
-#  Each workstation loops continuously and generates a realistic traffic mix.
+#  Each workstation loops continuously and generates a realistic, BENIGN traffic
+#  mix only: web browsing, internal DNS resolution and prod/preprod app access.
 #  The internal DNS (DMZ) is used for EVERY name resolution (see "dns:" in the
 #  compose file), so each web access first produces a work -> dmz (53) flow.
 #
-#  Behaviour is weighted by role (ROLE variable):
-#    - "healthy" traffic : web browsing (internet), prod/preprod app access
-#    - "drift" traffic   : rare deviations (direct DB access, scan, external
-#                          beacon) -> these are what make obserae shine in a demo.
+#  Behaviour is weighted by role (ROLE variable) purely to vary the mix; no
+#  workstation deviates on its own. Malicious/"drift" scenarios (network scan,
+#  direct DB access, external beacon) are NO LONGER generated here: they are
+#  opt-in and triggered on demand, one at a time, via scripts/attack-*.sh so you
+#  can build a clean baseline first and then observe exactly what one attack
+#  produces in obserae.
 # =============================================================================
 set -u
 
@@ -39,11 +42,6 @@ APPS=(
   "https://caddy-preprod.corp.lan"
   "https://staging.corp.lan"
 )
-
-# "Suspicious" external destinations -- DOCUMENTATION ranges (RFC 5737), which
-# are not routable on the internet: the SYN creates a flow to investigate in
-# obserae without actually reaching anything.
-SUSPICIOUS=("203.0.113.66" "198.51.100.13" "192.0.2.200")
 
 log() { echo "[$(date +%H:%M:%S)][${ROLE}] $*"; }
 
@@ -75,61 +73,34 @@ hit_app() {
   curl -s -k --max-time 5 -o /dev/null "${app}" || true
 }
 
-# ---- "Drift" actions (rare, probability-triggered) --------------------------
-
-# Direct workstation -> PostgreSQL access (east-west segmentation violation).
-direct_db() {
-  local hosts=("10.0.20.30" "10.0.30.30")
-  local h="${hosts[$(rnd ${#hosts[@]})]}"
-  log "DRIFT: direct DB access ${h}:5432"
-  PGCONNECT_TIMEOUT=3 psql "postgresql://app:app@${h}:5432/appdb" \
-    -c "SELECT 1;" >/dev/null 2>&1 || true
-}
-
-# Beacon to a "known-bad" external IP.
-beacon() {
-  local ip="${SUSPICIOUS[$(rnd ${#SUSPICIOUS[@]})]}"
-  log "DRIFT: external beacon ${ip}"
-  curl -s --max-time 3 -o /dev/null "http://${ip}/" || true
-}
-
-# Internal port scan (reconnaissance).
-port_scan() {
-  local target="10.0.20.0/28"
-  log "DRIFT: scan ${target}"
-  nmap -sT -Pn --max-retries 1 --host-timeout 8s -p 22,80,443,5432,8000 \
-    "${target}" >/dev/null 2>&1 || true
-}
-
 log "starting simulator (min=${MIN_SLEEP}s max=${MAX_SLEEP}s)"
 
+# Every branch is benign. The role only shifts the weighting so the traffic mix
+# looks a bit different per workstation. Attacks are triggered on demand via
+# scripts/attack-*.sh, never from this loop.
 while true; do
   roll=$(rnd 100)
 
   case "${ROLE}" in
     dev)
-      # Developer: lots of app + internet; occasionally hits the DB directly.
+      # Developer: lots of app + internet.
       if   [ "${roll}" -lt 45 ]; then hit_app
-      elif [ "${roll}" -lt 70 ]; then browse_internet
-      elif [ "${roll}" -lt 90 ]; then dns_lookup
-      elif [ "${roll}" -lt 96 ]; then direct_db        # drift ~6%
-      else                            beacon           # drift ~4%
+      elif [ "${roll}" -lt 75 ]; then browse_internet
+      else                            dns_lookup
       fi
       ;;
     ops)
-      # Ops: occasionally scans the network (reconnaissance drift).
+      # Ops: balanced app / dns / web.
       if   [ "${roll}" -lt 40 ]; then hit_app
       elif [ "${roll}" -lt 65 ]; then dns_lookup
-      elif [ "${roll}" -lt 88 ]; then browse_internet
-      else                            port_scan        # drift ~12%
+      else                            browse_internet
       fi
       ;;
     finance|hr)
-      # Office profiles: mostly web + a little app; rare beacon.
+      # Office profiles: mostly web + a little app.
       if   [ "${roll}" -lt 55 ]; then browse_internet
       elif [ "${roll}" -lt 80 ]; then dns_lookup
-      elif [ "${roll}" -lt 97 ]; then hit_app
-      else                            beacon           # drift ~3%
+      else                            hit_app
       fi
       ;;
     *)

@@ -216,6 +216,18 @@ fetch_files() {
   ok "Fetched $_count files into $DEMO_DIR"
 }
 
+# When run privileged via sudo, hand the demo dir back to the human who invoked
+# it so the manual import commands (host-side `< file` redirects) and later edits
+# work without root. No-op when not root or when there is no invoking user.
+fix_ownership() {
+  [ "$(id -u)" -eq 0 ] || return 0
+  [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ] || return 0
+  _owner="$SUDO_USER"
+  [ -n "${SUDO_GID:-}" ] && _owner="$SUDO_USER:$SUDO_GID"
+  chown -R "$_owner" "$DEMO_DIR" 2>/dev/null \
+    || warn "could not chown $DEMO_DIR to $SUDO_USER — you may need sudo to read the import files."
+}
+
 # --- Confirmations (works under `curl | sh` via /dev/tty) --------------------
 confirm() {
   [ "$ASSUME_YES" = "1" ] && return 0
@@ -276,6 +288,7 @@ cmd_install() {
   check_host
   fetch_files
   write_env
+  fix_ownership
   if [ "$NO_START" = "1" ]; then
     info "Validating the compose file (--no-start) ..."
     compose config -q && ok "Compose file is valid. Skipping build/up (--no-start)."
@@ -302,6 +315,7 @@ cmd_update() {
   require_daemon
   fetch_files
   write_env
+  fix_ownership
   info "Rebuilding and restarting (pulling newer images) ..."
   compose up -d --build --pull always
   wait_ui

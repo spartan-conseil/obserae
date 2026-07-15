@@ -6,6 +6,201 @@ dates; binaries and Docker images for each version are on the
 [releases page](https://github.com/spartan-conseil/obserae/releases). This is a
 bird's-eye view, not an exhaustive commit log.
 
+## [0.29.0] — 2026-07-15
+
+- **Anomaly rules gain emission gates — page on what matters, not on every blip.**
+  Three optional knobs decide *what to alert on* once the baseline is right, and
+  each is built so it can never create a blind spot. **Direction** fires only on a
+  rise or only on a drop (a monotone port count vs. a liveness signal that
+  shouldn't fall to zero). A **dead-band** ignores operationally-trivial
+  deviations — a 3-vs-1 port count is huge in σ but nothing worth waking someone —
+  while a *sustained* sub-band breach still escalates, so low-and-slow is never
+  hidden. **Persistence** debounces single-bucket blips, yet a single massive
+  spike still fires immediately. All default off, all gate only the alert (never
+  the learning), and all are tunable live in the Anomaly Lab. The dead-band is the
+  right tool where operators used to bolt a `HAVING` on the query — which silently
+  *corrupts* the baseline by hiding observations from it.
+
+- **Anomaly detection no longer pages all day on count metrics.** A detector that
+  watches a discrete count — distinct ports, peers, hosts — used to fire the
+  instant a normally-constant value ticked by one: with the spread collapsed to
+  zero, a two-vs-one reads as a *billion*-sigma anomaly. Two composable knobs fix
+  it, on every baseline method: a **spread floor** (in raw units — set it to the
+  count quantum, `1`) that stops a collapsed spread from manufacturing a huge
+  z-score, and a **variance-stabilizing transform** (`sqrt` for counts, `log1p`
+  for byte volumes) so a single symmetric band is statistically valid on a skewed
+  metric. Both default off — existing rules are unchanged — and both are tunable
+  live in the Anomaly Lab (which now shows the effect on the fire count before you
+  commit) and on the rule form. The nine shipped anomaly detectors adopt them.
+
+- **The Anomaly Lab now tells you the real reason a query can't be tuned.** A
+  single catch-all — *"it needs a terminal `STATS <metric> BY <keys>`"* — used to
+  fire for seven different causes, including the common trap of a valid terminal
+  `STATS ... BY` with a `HAVING` bolted on to "cut false positives". That `HAVING`
+  is worse than nothing: the baseline only ever sees the rows the query returns,
+  so a post-`STATS` filter censors observations and *corrupts* the learned normal.
+  The lab now names the actual cause and, for a post-`STATS` filter, points you to
+  a spread/trigger floor on the rule instead.
+
+- **The Anomaly page is now a workstation.** Clicking a fire — or a baseline —
+  opens **one screen per anomaly**: the chart with *the point you clicked starred*,
+  and beside it everything needed to read it. A sentence says what happened
+  (*"Observed 412 where 18 was expected — 9.7σ above the centre, outside the normal
+  band"*), tiles give the numbers, and a rail carries the entity's identity, its
+  other fires, the rows it matched, the *investigate at fire time* link, and
+  Acknowledge/Close. Nothing needs a hover, and nothing needs a second page.
+  The display window now follows the fire: a three-day-old alert used to open an
+  empty 24-hour chart.
+
+- **An alert tells you who its entity is.** An alert named its entity by value —
+  `client_ip=203.0.113.10` — which is a number, not a lead. Every IP now reads as
+  an identity: its **cartography asset**, name first (`web-01 (10.8.8.8)`), or the
+  network it sits in; and for a public address its **country** (with flag), its
+  **ASN**, and the **threat or cloud feeds that list it**. An address with no asset
+  name is itself a finding — nothing in your inventory claims it. A composite key
+  (`client_ip, server_ip`) shows both halves, one per line. On Detection and on
+  Anomaly, rendered identically.
+
+- **Fix: a composite-key anomaly rule never showed its fires.** Not "showed them
+  wrongly" — showed **none**, silently, on its chart and in its entity detail.
+  Every shipped scan detector groups by two columns, so this was the common case.
+  The per-entity fire lookup only understood single-column keys and gave up on the
+  rest without a word.
+
+- **Fix: the Anomaly and Cartography pages had a phantom scrollbar.** Both computed
+  their height with a formula written before the page footer existed, and so stood
+  a footer's height taller than the space they had — a scrollbar on an empty page.
+  Both now fit the window; the drawer and the graph scroll inside themselves.
+
+- **Faster drawer.** Opening a rule replayed seven days of flows through the query
+  engine just to decide whether to offer the activity heatmap. The heatmap is now
+  computed when you actually ask for it.
+
+- **Enrichment sources now explain themselves.** A feed used to be just a name:
+  nothing told you what *IPsum* or *CINS Army* actually is, who publishes it, or
+  whether it is noisy enough to bury you in false positives — you had to leave
+  the page and read the docs. Hover a source name (or tab to it) on Threat
+  Intelligence, Cloud Attribution, GeoIP or ASN and a card now gives its role,
+  origin, confidence and false-positive profile, so you can decide whether to
+  enable it on the spot. The same information is exposed on the API, under
+  `info`, for every source.
+
+- **Fix: an anomaly rule could not be created from scratch.** The form rejected
+  *Create* with “needs a numeric column metric (not rows)” while the **Metric**
+  field plainly showed the column — often the only one the query offered. The
+  anomaly Metric picker lists numeric columns only, but the form's metric still
+  defaulted to `rows`, which is not among them: the browser fell back to
+  displaying the first column while the form kept submitting `rows`. With a
+  single numeric column there was no way out, since re-picking the shown option
+  changes nothing. The picker now holds what it displays. Editing an existing
+  rule was hit by the same bug as soon as its saved query was re-selected.
+
+- **Fix: an anomaly rule could not be deleted.** The drawer on the Anomaly
+  Detection page offered Edit and Duplicate but no Delete, so a rule you own
+  could only be removed from the Alerting Rules page. It now offers Delete, with
+  the same confirmation, for any rule that is not owned by a rule set.
+
+- **Fix: Duplicate did nothing on the Anomaly Detection page.** A ruleset-owned
+  rule (`std.anomaly.*`) is read-only, so its drawer offers *Duplicate* instead of
+  *Edit* — the only way to tune a shipped anomaly rule. On the Anomaly Detection
+  page the button was wired to a handler that page did not have, so clicking it
+  did nothing at all. It now clones the rule (and its query) into an editable,
+  disabled copy and opens its drawer, exactly as on the Alerting Rules page.
+
+- **Fix: form fields came back on a white background once the browser remembered
+  them.** Re-opening *New alert rule* and picking a name you had already submitted
+  handed the field to Chrome's autofill, which paints from its own stylesheet at a
+  priority no page style can beat — a white box in the middle of a navy form. The
+  app now declares a dark colour scheme, so everything the browser draws for itself
+  (autofill, native `select` popups, checkboxes, scrollbars) follows the theme, and
+  autofilled fields are repainted in the input colour. Applies everywhere a browser
+  may autofill, not just to alert rules. The alert-rule modal also gains the focus
+  ring and the accented checkboxes it was missing.
+
+- **Fix: an anomaly rule's baseline method was ignored at run time.** The
+  evaluator never loaded `baseline_method` or `anomaly_window` from the database,
+  so **every anomaly rule ran as EWMA** with an unbounded window whatever the GUI,
+  the rulepack or the config bundle said — while the chart on the Anomaly
+  Detection page drew the *configured* method. Switching a noisy rule to
+  **Median + MAD** or **Seasonal**, the fix the docs recommend, therefore did
+  nothing. Both settings now reach the estimator. A rule already configured as
+  `median_mad` or `seasonal` carries an EWMA baseline today and will re-enter
+  warm-up once the right estimator takes over — expect a quiet period while it
+  relearns, exactly as after a manual baseline reset.
+
+- **New: the Anomaly Lab** (*Analysis → Anomaly Lab*). A page to design and tune an
+  anomaly rule against your real data **before it pages anyone**. Pick a signal — an
+  existing rule, a saved query, or NFQL typed on the spot — pick an entity, then move
+  **k / α / N / warm-up**: the band, the graded anomalies and the alert count redraw
+  as you go. A **sweep** scores a grid of settings and recommends the quietest one
+  inside the alert budget you say you can read, and **Apply to the rule** writes it
+  back. Because the signal need not be a rule yet, a rule can be worked out *before*
+  it is created.
+
+  It tells you two things the Anomaly Detection chart cannot. First, **the spread the
+  estimator believes against the spread your data really has** — when that ratio runs
+  away, the `k` on your rule is not the `k` that is running, and the page says so.
+  Second, **the bucket the engine really uses**: a rule observes once per cadence, so
+  the Lab replays at the cadence, while the Anomaly Detection chart re-buckets to fit
+  500 points on screen — which is why *its* dots and its fire rings do not always line
+  up. Nothing in the Lab is a second implementation: it folds your series through the
+  engine's own estimator.
+
+- **Docs: corrected anomaly tuning advice.** Two recommendations were measured and
+  found wrong, and the guidance now says so. On a **heavy-tailed volume metric**
+  (bytes, packets), freeze-on-fire withholds every firing value from the variance,
+  so the estimator settles on a σ roughly **four times below** the data's true
+  spread — `k = 3` really means `k ≈ 0.75`, and a healthy host pages you several
+  times a day. The fix is a **much larger k**, *not* Median + MAD, which is tighter
+  still on a skewed series and fires about twice as often. And on a **recurring
+  burst** (a nightly backup), Median + MAD never goes quiet **at any k**. The Anomaly
+  Lab measures all of this against your own traffic.
+
+- **Fix: orphan anomaly baselines are now reclaimed.** An anomaly rule's learned
+  baseline (`data/baseline/rule=<id>/`) used to survive when the rule was removed
+  on a path other than a direct delete — a rulepack delete/upgrade or a config /
+  alerting bundle import — so stale baselines accumulated on disk and in RAM (and
+  showed up as bare hashes on the Storage page). Those paths now reconcile the
+  baseline store against the live rules, and the daemon also sweeps orphans once
+  at boot, so this no longer happens in production.
+
+- **Storage page refresh.** The parquet-store charts are recoloured to the
+  UI's steel-blue accent (was an off-brand turquoise). Stores that have no time
+  axis now live in their own **Reference data** block, rendered as ranked bars:
+  the **Anomaly Baseline** card — previously blank despite holding files — now
+  shows a per-rule breakdown labelled by rule name, and enrichment ranges show a
+  ranked-by-size source breakdown instead of a plain list.
+
+- **abuse.ch Auth-Key is now part of the Config I/O bundle.** The shared
+  Threat-Intelligence API key (Feodo/ThreatFox) was left out of config
+  export, so a restore silently lost it and the feeds went quiet. It now
+  travels in the bundle as its at-rest encrypted envelope (never in clear
+  text) — the same round-trip devices' secrets use — so a restore recreates
+  working feeds. A key sealed under a different master key is kept verbatim
+  and flagged to be re-entered, and importing a bundle that leaves a
+  key-gated feed enabled with no key on file raises a restore-time warning.
+
+- **Fix: enrichment feed rows now align into clean columns.** On the Threat
+  Intelligence and Cloud Attribution pages, each feed row's Refresh button,
+  toggle and "Edit API key" button drifted horizontally from row to row (and
+  jittered as feeds refreshed). The live row's grid was inheriting a placement
+  rule meant for the static placeholder card, spawning phantom columns whose
+  width followed each row's text; the action cluster is now pinned to a single
+  right-aligned column on every row, mid-refresh included.
+
+- **NAT-aware session consolidation.** Multi-exporter sessions can now be
+  consolidated across inferred SNAT, DNAT and PAT while preserving pre-NAT
+  endpoints. NFQL exposes bounded aggregate and recent socket-level NAT tables,
+  and Sessions marks translated conversations without double-counting.
+
+- **Eight new threat-intelligence feeds.** The Threat Intelligence page gains
+  Emerging Threats (Compromised IPs), CINS Army, IPsum (with a tunable
+  `ipsum_level`), FireHOL Proxies/Anonymous, an X4BNet VPN list, and the two
+  abuse.ch feeds — Feodo Tracker and ThreatFox (the latter tagging each hit with
+  its malware family). The keyless feeds are on by default; the abuse.ch feeds
+  need a free Auth-Key, saved (encrypted at rest) from a new key field on the
+  page and set/cleared via `PUT /api/enrichment/abusech-key`.
+
 ## [0.28.0] — 2026-07-08
 
 - **One-line installer is now front and centre in the docs.** The

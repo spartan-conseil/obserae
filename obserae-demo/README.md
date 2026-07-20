@@ -169,12 +169,11 @@ SOCK=/var/lib/obserae/run/obserae.sock
 # 1. Load the demo master key FIRST (rotation) so the bundle's secrets decrypt.
 docker compose exec -T obserae obserae-cli --socket "$SOCK" masterkey import - < obserae-masterkey.txt
 
-# 2. Validate, then import the full configuration bundle.
-docker compose exec -T obserae obserae-cli --socket "$SOCK" config validate - < obserae-config.yaml
+# 2. Import the full configuration bundle (validated in full before any write).
 docker compose exec -T obserae obserae-cli --socket "$SOCK" config import  - < obserae-config.yaml
 ```
 
-Prefer clicking? The UI does the same from **Config I/O**: the **Master key**
+Prefer clicking? The UI does the same: **Settings → Master key**
 modal → *Import*, then **Import config**. Either way, once it finishes the
 **Cartography**, **Flow Matrix** and **Rules** pages are already populated — every
 rule and NFQL query can refer to assets by name (`host:prod-db`, `group:work-grp`,

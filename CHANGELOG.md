@@ -6,6 +6,171 @@ dates; binaries and Docker images for each version are on the
 [releases page](https://github.com/spartan-conseil/obserae/releases). This is a
 bird's-eye view, not an exhaustive commit log.
 
+## [0.30.0] — 2026-07-20
+
+- **The master key has its own page, and the Config I/O page is gone.** Two
+  unrelated things had been sharing one screen: a configuration bundle, which
+  is portable operator data, and the master key, which is the root credential
+  sealing every secret. The key now lives at **Settings → Master key**, where
+  you can read it as base64, **download `masterkey.bin`** — the exact file the
+  daemon reads at boot, so you can drop it into a data directory before a
+  restore instead of decoding a `.txt` by hand — and rotate it. Exporting the
+  configuration is now a button at the top right of the **Backup** page, next
+  to a new **Download archive (.tar.zst)**; importing one stays on **Restore**,
+  where it already lived. **Breaking:** `/api/config-io/*` moved to
+  `/api/config/*` (export, import, restore) and `/api/masterkey/*`.
+
+- **The separate "validate a configuration file" step is gone.** Importing a
+  bundle already checks the whole file before writing anything, so an invalid
+  file is refused rather than half-applied — the extra dry-run button, the
+  `obserae-cli config validate` verb and the `POST /api/config-io/validate`
+  endpoint only duplicated that guarantee. **Breaking:** scripts calling
+  `config validate` should call `config import` and check its exit status.
+
+- **The daemon starts in about a second instead of freezing for twenty.** On
+  startup obserae rebuilt every threat-intel and cloud IP catalogue in memory
+  *before* opening its network sockets. With large feeds that took roughly
+  twenty seconds, and during the whole window no flow was collected — the
+  exporters kept sending, and those packets were simply lost — while the web
+  interface refused connections. The catalogues are now rebuilt in the
+  background: listeners and the GUI come up immediately, and enrichment fills
+  in behind them, source by source, over the next few seconds. Flows that
+  arrive in that short window are collected normally; a handful may miss their
+  threat-intel or cloud label. Loading is also faster in itself (about three
+  times), so the window is short.
+
+- **The turquoise accent is gone.** Progress bars, links, numeric values, chart
+  series and cartography swatches used a turquoise `#4FBFBE` that clashed with
+  the rest of the console. It is replaced everywhere by a periwinkle blue in the
+  same cool family as the navy background, so the interface reads as one palette
+  again. Cartography nodes you had coloured with one of the three retired
+  turquoise swatches are remapped automatically on upgrade — no action needed.
+
+- **Local backups are now multi-directory processes, and Run now shows a live
+  bar + ETA again.** A local snapshot is a first-class process with **its own
+  directory**, so you can run several — for example one to a local disk and one to
+  a mounted NAS partition — each with its own full/delta cadence and retention;
+  the standalone "Backup policy" card is gone. **Run now** on a remote (SFTP/S3)
+  process shows a live **progress bar + ETA** again (it had regressed to a plain
+  text line). A **full restore no longer drops your offsite backup configuration**
+  — restoring an archive pulled over SFTP used to wipe the very SFTP destination it
+  came from. On the Restore page, the cards are spaced out and **"Restore from a
+  local archive"** now lives there (moved off the Backup page).
+
+- **Backup is now a list of scheduled processes, with a new Data Protection menu
+  and a redesigned Restore page.** Retention, Backup and Restore moved out of
+  Settings into a dedicated **Data Protection** section. Instead of one global
+  schedule, the Backup page opens on an **at-a-glance status strip** — how many
+  processes, how many enabled, anything failing, the next run and the last
+  success — above a **list of independent backup processes** (for example a
+  **local copy every hour** and an **offsite copy once a day**). **"Add backup"**
+  opens one self-contained form that sets **where the copy goes** (a local folder,
+  an S3 bucket, or an SFTP server) together with **when** it runs (every N
+  minutes/hours, daily, or weekly, in UTC) and **how many** to keep (*keep the
+  last N*, or **smart (GFS)** — the newest of the last N days, N weeks and N
+  months, default 7/4/3) — no configuring a destination separately first. Click a
+  process to open a **detail panel** on the right with its settings, a **Run
+  now** / **Test connection** / **Ship now** action row, its run history, and — for
+  the local-snapshot process — the **point-in-time timeline** to restore to an
+  earlier moment. A failed run surfaces as a **red error chip** with the message,
+  so what broke is obvious at a glance. SFTP destinations gain an insecure
+  **"skip host-key verification"** opt-in (and S3 a **CA-certificate / skip-TLS**
+  option) for self-signed or un-pinnable servers — unsafe, surfaced with a warning.
+  The **Restore** page pulls it together, full width: paste the master key once,
+  then choose to restore **everything** (pull a remote `.tar.zst`, validated
+  master-key-first, with a multi-step **progress bar + ETA**) **or the
+  configuration only** (a bundle, no master key needed) — two clear choices side by
+  side instead of an ambiguous stack of steps. **Run now** on any process now backs
+  up immediately and shows a **live result** in the panel (running → ✓ shipped, or
+  ✗ with an actionable hint) honouring the process's own retention — no more silent
+  no-op — and the redundant "Ship now" button is gone. Failures that used to be
+  dead ends now explain themselves: a destination blocked by the egress guard says
+  to allow its CIDR in `backup.egress_allow_cidrs` and restart (instead of a bare
+  `egress: destination address not permitted`), and an offsite backup with nothing
+  to ship says to take a local snapshot first.
+
+- **Config export/import now includes backup destinations and processes.** A
+  consolidated config YAML (`obserae-cli config export` or the Config I/O page)
+  now round-trips the offsite **backup destinations** (local/S3/SFTP) and the
+  scheduled **backup processes** — previously they were absent, so a restored
+  instance lost its backup wiring. A process references its destination **by
+  name** (portable across instances), and each destination's secret rides
+  **encrypted** (re-usable only on the same instance/master key — re-enter it
+  after a move to a new instance).
+
+- **Backups can now go offsite — download, S3 or SFTP — and restore directly.**
+  Backups used to write only to a local directory, which is a single point of
+  failure on a mono-instance host. A backup point-in-time can now be packaged as
+  one portable, self-contained `.tar.zst` archive and **downloaded from the
+  browser**, or shipped to an **S3-compatible bucket** (AWS, MinIO, Backblaze, …)
+  or an **SFTP server**. Uploads run through an SSRF guard (an upload can't be
+  pointed at cloud metadata or an internal service) and SFTP host keys are pinned.
+  A destination can be flagged **ship-on-full**: after each daily full snapshot the
+  archive is shipped automatically and remote storage is kept bounded (**keep the N
+  newest**, prune the rest). Every ship shows a **live progress bar + ETA** and a
+  persistent topbar indicator.
+  **Restore is direct and master-key-first.** The archive contains everything
+  **except the master key** (which never leaves the host in a backup), so to
+  restore onto a fresh machine you upload the archive **and provide the matching
+  `masterkey.bin`** — it is validated against the archive (format, DuckDB version,
+  a sealed canary) **before anything is touched**, so a wrong key or a
+  cross-version archive is refused up front with the live database intact; only
+  then is the database swapped and the key installed. All of this is available in
+  the web GUI (a new **Backup** page section, gated by the new `backup:read` /
+  `backup:manage` permissions; the destructive restore stays admin-only) and at the
+  command line: `obserae-cli backup destinations list|add|remove`,
+  `backup ship --destination ID`, and
+  `backup restore-from-archive --file … --master-key-file … --confirm`.
+
+- **"Download archive" no longer hands back an empty file.** On a machine with no
+  backup snapshot yet (backups off, or never run), clicking **Download archive**
+  saved a **0-byte `.tar.zst`** that looked successful — the server hit "no
+  snapshot to pack" *after* it had already sent the download headers, so the
+  browser recorded an empty 200. The download now builds the archive **before**
+  sending any header (a real error surfaces as a real HTTP status), and when
+  there is nothing to pack it **creates a fresh full snapshot on demand** and
+  streams that — so a first-time download just works, even with scheduled backups
+  disabled.
+
+- **Rotating the master key now re-encrypts every secret, not just three of them.**
+  A master-key import (Config I/O modal or `obserae-cli masterkey import`) re-keyed
+  only the alert-output secrets, OPNsense API secrets and session-signing keys —
+  but silently left the per-user MFA secrets, the LDAP bind password, the OIDC
+  client secret and the abuse.ch Auth-Key sealed under the *old* key. Once the old
+  key was dropped, those four became undecryptable (MFA logins, LDAP/OIDC sign-in
+  and the abuse.ch feeds would break). The rotation now covers all of them, and a
+  test pins the full set so a new secret location can't drift out of coverage again.
+
+- **Restoring a configuration no longer freezes the UI or looks like it crashed.**
+  Importing a large bundle (a big cartography plus many rules) used to run
+  synchronously inside the request: it blocked past the server's write timeout, so
+  the reverse proxy returned a 502 and the page looked frozen — and even after it
+  came back, rule compilation and the cartography rebuild were still running in the
+  background, so opening the cartography showed an empty graph and the operator
+  assumed the import had failed. The restore now runs asynchronously with a live
+  **progress bar, per-phase detail ("compiling rule 45/200") and an ETA**, streamed
+  over Server-Sent Events. A **persistent topbar indicator** shows the progress on
+  every page, so navigating to the cartography mid-restore makes clear it is still
+  running. Crucially, **"done" is now truthful**: the restore reports complete only
+  once the cartography has been rebuilt, so the "Open cartography" button never
+  lands on an empty graph. The restore also runs on a detached context (a proxy
+  timeout or a closed tab can no longer cancel a half-applied restore) and is
+  single-flight (a second concurrent restore is refused). The CLI/scripting
+  `POST /api/config-io/import` stays synchronous and unchanged.
+
+## [0.29.1] — 2026-07-15
+
+- **Anomaly emission guards now actually reach the detector.** The spread floor,
+  the variance-stabilizing transform and the direction / dead-band / persistence
+  gates shipped in 0.29.0 were read by the edit form, the reconstruction chart and
+  the validator — but the detector itself never loaded them. A rule configured with
+  a spread floor still fired billion-sigma false positives on a near-constant count
+  (a vertical-scan rule on distinct ports flipping 2↔1), while the chart drew that
+  same point as *within normal*. Fixed end to end: the engine now loads every knob
+  each tick, and creating a rule persists the guards on first save (they used to
+  take effect only after a later edit). A reflection parity test pins the engine
+  and store rule-loaders together so this class of drift can't recur silently.
+
 ## [0.29.0] — 2026-07-15
 
 - **Anomaly rules gain emission gates — page on what matters, not on every blip.**

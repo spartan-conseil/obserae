@@ -345,7 +345,7 @@ cartography:
       x: 520
       "y": 2320
       pinned: true
-      color: '#0D9488'
+      color: '#92400E'
     - kind: host
       name: ws2-ops
       x: 200
@@ -363,7 +363,7 @@ cartography:
       x: -520
       "y": 2320
       pinned: true
-      color: '#0D9488'
+      color: '#92400E'
     - kind: host
       name: ws5-mkt
       x: -920

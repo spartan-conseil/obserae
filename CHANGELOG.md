@@ -6,6 +6,86 @@ dates; binaries and Docker images for each version are on the
 [releases page](https://github.com/spartan-conseil/obserae/releases). This is a
 bird's-eye view, not an exhaustive commit log.
 
+
+## [0.31.0] — 2026-07-21
+
+- **Added: the OpenAPI spec is now linted.** `make lint-openapi` runs vacuum
+  (pinned as a `go tool`, no node toolchain) against
+  `docs-web/docs/openapi.yaml`, and a CI job lints it on every pull request that
+  touches the spec. This catches structural regressions — dangling `$ref`s,
+  duplicate `operationId`s, invalid 3.1 constructs — that the previous
+  reference-only guard test could not.
+
+- **Fixed: the OpenAPI spec is importable again.** Retiring the Config I/O page
+  accidentally deleted the whole `components:` block of
+  `docs-web/docs/openapi.yaml` while leaving every `$ref` that pointed at it, so
+  the shipped spec could not be imported into Postman/Insomnia. The block is
+  restored, and a Go test now fails the build if any local `$ref` is left
+  dangling.
+
+- **Fixed: editing a rule no longer stalls detection.** Changing a rule or a
+  flow-matrix cell rewound that rule's matcher cursor to "re-examine all of
+  history". On any real retention horizon that never finishes: each pass had to
+  read further back than the last, so the daemon burned CPU, stopped responding,
+  and eventually stopped producing detections altogether — while ingestion, and
+  every ingestion counter, stayed perfectly healthy. One rewound rule was enough
+  to slow matching for every rule. The rewind is now bounded to the last few hours by
+  default (`matcher.rematch_window`; set it negative to apply an edited rule to
+  future traffic only).
+
+- **Fixed: the detection matcher can no longer get permanently stuck.** Each
+  pass now reads a bounded window of history (`matcher.catchup_window`, 2h by
+  default) instead of everything since the last one, so a backlog drains at a
+  steady rate rather than making every pass slower than the one before. A daemon
+  that has fallen behind now catches up on its own, including after a restart.
+
+- **Added: a horizon on how far behind detection may fall.** Past
+  `matcher.max_lag` (6h by default) the daemon gives up on the history it cannot
+  catch up on and resumes on live traffic. Those sessions are never matched
+  against any rule, so it is not silent: the skipped window is written to the
+  audit journal as `matcher.backlog.shed` and shown in the GUI as **Detection
+  coverage dropped**. Set `matcher.max_lag: 0` if you would rather wait than
+  lose coverage.
+
+- **Changed: the detection backlog has its own panel in Monitoring.** It used to
+  sit inside **Writer pool**, which could read "writer idle, all is well" while
+  detection had been down for days — the matcher works on a different connection
+  pool entirely. The warning now reports how far behind the matcher is (in time,
+  which means the same thing whatever your traffic rate) and no longer suggests
+  lightening rules or changing their cadence, neither of which was the cause.
+
+- **Fixed: the backlog gauge no longer makes the problem worse.** Counting
+  unmatched sessions meant scanning the whole session store every two seconds
+  once the matcher fell behind, permanently occupying a quarter of the read
+  capacity — taken from the matcher trying to catch up. The count is now an
+  estimate; the alert is on how far behind the cursor is.
+
+- **Fixed: cartography nodes no longer change size on their own.** Nodes could
+  drift between too small to read and so large they overlapped, with no action
+  from you. Two causes, both removed. The map resized itself whenever the canvas
+  changed height — the read-only banner appearing was enough — because the
+  compensation read the on-screen scale one frame too early and concluded there
+  was nothing to correct. And every automatic refresh (another admin editing,
+  any alert firing) re-derived the size from the span of the data, so one host
+  dragged far away could squeeze everything else until the discs touched. Node
+  size is now computed from the window alone, so the data cannot influence it.
+  An automatic refresh updates what the nodes show and leaves your view exactly
+  where it was, unless it would leave you facing an empty canvas — after a YAML
+  import replacing the topology, for instance — in which case the map reframes
+  rather than show you nothing. **Fit** now centres on the bulk of the map, so a
+  distant host no longer drags the view into empty space. An active network
+  filter or search also survives a refresh instead of being silently cleared.
+
+- **Fixed: one bad NAT translation no longer blanks the Sessions riverview.** If
+  a recorded NAT address could not be read back, the query behind the riverview
+  failed outright and the chart stayed empty — once a second, for as long as the
+  row lived. Such a row is now skipped: the riverview falls back to the NAT
+  metadata held on the consolidated conversation and keeps drawing. The affected
+  row is also reported in the daemon log so the underlying cause can be traced,
+  and NAT observations carrying an unusable address are rejected before they are
+  stored. Queries on `nat_translations` and `nat_relations` no longer return
+  rows whose addresses do not parse.
+
 ## [0.30.0] — 2026-07-20
 
 - **The master key has its own page, and the Config I/O page is gone.** Two

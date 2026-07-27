@@ -6,6 +6,122 @@ dates; binaries and Docker images for each version are on the
 [releases page](https://github.com/spartan-conseil/obserae/releases). This is a
 bird's-eye view, not an exhaustive commit log.
 
+## [0.32.0] — 2026-07-27
+
+### Added
+
+- **Enrichment data can be purged per source.** Disabling a source keeps its
+  downloaded ranges so it can be enabled again immediately, while **Purge data**
+  (or `obserae-cli enrichment purge NAME`) removes them when the disk space is
+  needed. The source remains configured and past enriched traffic is unchanged.
+
+- **The Assistant brings plain-language investigations and confirmed actions to
+  obserae.** It can resolve objects on the map, build and run queries, inspect
+  enrichment feeds, and answer with visible, re-runnable evidence. It can also
+  propose changes to the cartography, flow-matrix and detection rules, and
+  alerts; every write is checked against the user's permissions and requires
+  confirmation unless it was explicitly auto-approved for that conversation.
+  Conversations are private, retained for 90 days and covered by per-user
+  budgets.
+
+  Ollama, OpenRouter and DeepSeek providers are configured under Settings → AI
+  Providers. obserae discovers their models and published prices, protects API
+  keys at rest, and lets each provider override the Assistant's limits and
+  generation settings. Full guide: **docs/assistant.md**.
+
+- **Assistant conversations now have context and lifecycle controls.** A meter
+  shows how much of the selected model's context window is in use. Old messages
+  can be compressed manually or automatically without altering the visible
+  thread or its exports. A running turn can be stopped, local thinking models
+  show their reasoning while they work, and complete conversations can be
+  exported as Markdown reports or faithful JSON archives.
+
+- **NAT rules and detected translations can be managed from Network → NAT.**
+  SNAT and port-forward rules are declared on the translating device, shown as
+  readable sentences and used to fold both observed legs into one conversation
+  via that device. The page also exposes detected translations, their direction
+  evidence and rule proposals, including unused rules imported from OPNsense.
+  Operators can invalidate a bad detection or change automatic-detection policy
+  without restarting. Existing network-level declarations and older
+  cartography bundles are migrated automatically. Full guide: **docs/nat.md**.
+
+- **NAT correlation now works when one probe sees both sides.** Cartography can
+  identify the translating device when exporter order cannot: declare its
+  interfaces in both networks or an explicit NAT rule. NFQL exposes the method
+  that proved each direction so the result remains auditable; without such
+  evidence, same-probe traffic is deliberately left unmerged.
+
+- **Alert maintenance now covers bulk cleanup and journal compaction.**
+  `obserae-cli alert purge` deletes alerts selected by severity, status, rule or
+  age, with confirmation by default. In the background, completed hours of the
+  append-only alert journal are compacted into one current record per alert,
+  keeping reads fast without dropping data.
+
+- **Session queries can include cartography names.** The `client_host`,
+  `server_host` and `server_service` fields expose the endpoint and service names
+  recorded when a session closed, so investigations can show meaningful names
+  without joins while preserving the historical context after later renames.
+
+### Fixed
+
+- **Disabling an enrichment source now stops matching immediately.** Its ranges
+  are unloaded from memory and remain inactive across restarts; the global
+  enrichment switch does the same for every source. Downloads remain on disk
+  for a fast offline re-enable, and disabled sources can no longer be refreshed
+  accidentally.
+
+- **The Sessions matrix no longer reports unevaluated traffic as unmatched.**
+  Sessions that closed after the matcher's last pass are shown as pending and
+  excluded from both the Unmatched view and the cockpit's coverage calculation.
+  Each aggregated ribbon also shows its matched and unmatched split.
+
+- **Deleting many alerts is now a single batched operation.** Bulk deletion no
+  longer re-reads and syncs the complete alert journal once per alert, removing
+  the multi-second stalls seen with large selections.
+
+- **Routine storage maintenance no longer raises false alarms.** Reads racing
+  with Parquet compaction are still retried but logged at debug level, while
+  genuine failures remain errors. Database checkpoints now wait for ordinary
+  write transactions within a bounded interval instead of emitting harmless
+  `checkpoint failed` warnings.
+
+- **Editing the network map is responsive and no longer loses moves.** Editable
+  topology is served independently from slower activity, alert, country and
+  DHCP decorations, which load in the background. Superseded refreshes are
+  discarded so an older response cannot repaint a node at its previous
+  position.
+
+## [0.31.2] — 2026-07-21
+
+- **Fixed: clicking a network with a DHCP range no longer stalls for seconds.**
+  On busy instances, opening a network that has a DHCP range configured could hang
+  for tens of seconds, while networks without one (and host nodes) stayed fast.
+  The drawer's "live DHCP leases" were computed by scanning the last 24h of traffic
+  on every click, which on a busy sensor means opening thousands of small data
+  files — so the click waited on the files, not the data. That computation now runs
+  in the background and is cached, so opening a network (and the DHCP badge counts
+  on the map) is a fast cache read. Two smaller cartography fixes ship alongside it:
+  the firewall ARP/DHCP lease lookups now read only recent data instead of the whole
+  history, and the network map's topology is no longer rebuilt behind a lock that
+  could briefly freeze every map panel at once.
+
+## [0.31.1] — 2026-07-21
+
+- **Fixed: cartography labels no longer balloon when you zoom out.** Node and
+  group names kept a fixed size on screen but were multiplied as the camera
+  pulled back, so at topology-overview zoom they rendered enormous and
+  overlapping — you had to zoom far in to read anything. Labels now keep a
+  constant, legible size at every zoom, and when hosts pack tightly at overview
+  zoom the map thins overlapping names to a readable subset (hover a node to
+  read its name in full).
+
+- **Fixed: cartography stayed fluid under heavy traffic.** On busy instances the
+  cartography panels could randomly take several seconds to open. The web GUI now
+  runs on its own database connection pool, isolated from background jobs, so a
+  panel read never waits behind a heavy background scan; the network topology is
+  cached and only rebuilt after an edit; and the graph's activity scans are
+  bounded to recent data instead of the whole history. New
+  `storage.web_reader_conns` setting (default 4) sizes the GUI pool.
 
 ## [0.31.0] — 2026-07-21
 

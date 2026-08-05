@@ -41,7 +41,7 @@ It combines flow collection, network cartography, connectivity modelling and det
 - **Alert** through local and enterprise-ready outputs.
 - **Document** your network and its intended security posture.
 
-Obserae is an NDR focused on detection, investigation and alerting. It does not perform packet capture, replace a SIEM, or claim to provide autonomous remediation.
+Obserae is an NDR focused on detection, investigation and alerting. It does not perform packet capture and does not replace a SIEM. It performs no remediation of any kind: it is out-of-band, it blocks nothing, and enforcement belongs to the tools that already sit on the path — your firewalls, your NAC, your SOAR.
 
 ## Designed for security teams
 

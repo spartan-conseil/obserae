@@ -1,8 +1,8 @@
 # Support
 
-obserae is in **alpha**, and feedback genuinely shapes it — questions, bug
-reports and suggestions are all welcome. This page explains where to get help and
-what to expect.
+obserae is in **beta** and running in production at early-adopter sites, and
+feedback genuinely shapes it — questions, bug reports and suggestions are all
+welcome. This page explains where to get help and what to expect.
 
 ## Before you reach out
 
@@ -14,13 +14,12 @@ A quick check often answers it faster than a round-trip:
 - **Common gotchas** — the login loop over plain HTTP and the NetFlow v9 /
   IPFIX template warm-up (flows visible in `tcpdump` but the counter stays at 0)
   are documented in Installation and Configuring Exporters.
-- **Existing issues** — search the
-  [issue tracker](https://github.com/spartan-conseil/obserae/issues); your
-  question may already be answered.
+- **Support** — if the documentation does not answer the question, write to
+  <support@spartan-conseil.fr>.
 
 ## Reporting a bug or requesting a feature
 
-Open an issue: <https://github.com/spartan-conseil/obserae/issues>.
+Email <support@spartan-conseil.fr>.
 
 To get a useful answer quickly, please include:
 
@@ -41,7 +40,7 @@ reasonable window to fix it before any public disclosure.
 
 ## What support to expect
 
-- **Free / alpha** — best-effort help through GitHub issues, with no service-level
+- **Free / beta** — best-effort help by email, with no service-level
   guarantee (EULA art. 8). obserae is built by a small shop, so please be patient.
 - **Commercial license** — technical support, priority fixes, SLAs and custom
   development are part of a commercial agreement. See

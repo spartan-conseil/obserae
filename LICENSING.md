@@ -7,9 +7,13 @@ It does not replace the license — the binding terms are in `EULA.txt` (French)
 and `EULA.en.txt` (English courtesy translation), bundled with every release and
 Docker image.
 
-> obserae is currently **in alpha** (pre-1.0). Every feature is open and free
-> while it stabilises — including the features planned to become Enterprise
-> later (see *"Which features will become paid?"* below).
+> obserae is currently **in beta** (pre-1.0), and running in production at
+> early-adopter sites. Every feature is open and free while it stabilises —
+> including the features planned to become Enterprise later (see *"Which features
+> will become paid?"* below). From 1.0 on, the commercial editions are activated
+> by a **license file** installed on the instance and validated locally; the
+> Community edition needs none. Nothing is ever checked against our servers, in
+> beta or after — see *"Do I need a license key or internet access to run it?"*.
 
 ## Is obserae open source?
 
@@ -33,14 +37,15 @@ Yes, for two groups (EULA art. 2):
 - **Eligible small business** — a group of **≤ 20 people *and* ≤ €2,000,000**
   annual revenue. Both criteria are cumulative.
 
-It is **self-assessed**: there is no license key, no sign-up, no activation.
-During the alpha, every feature is open to everyone.
+Eligibility is **self-assessed**: the Community edition asks for no license key,
+no sign-up and no online activation. During the beta, every feature is open to
+everyone.
 
 ## Why are there limits, if it's free?
 
 obserae is both a passion and a business, and the bills are real. The aim is to
 be generous — free for individuals and small businesses, one-off audits allowed,
-every feature open during the alpha — without leaving the door open to abuse.
+every feature open during the beta — without leaving the door open to abuse.
 Software usually ends up *tightening* its license because of abuse at scale, so
 obserae keeps a **few structural limits** rather than an unverifiable "fair use"
 clause.
@@ -67,7 +72,7 @@ Commercial contact: <licensing@spartan-conseil.fr>.
 ## Which features will become paid?
 
 A small, stable set — and we name them now rather than springing them on you
-later. All of them are **free and open during the alpha**:
+later. All of them are **free and open during the beta**:
 
 - **Users & access management** — multiple user accounts, groups, role-based
   access control (RBAC) and API tokens. (The single administrator login the GUI
@@ -114,30 +119,47 @@ over them (EULA art. 6.3).
 
 ## Do I need a license key or internet access to run it?
 
-No key, no activation, no online check. obserae runs entirely offline — core
-ingestion, queries and the GUI have no external dependency.
+Never internet access: **no online activation, no online check**, no external
+dependency for ingestion, queries or the GUI. obserae runs entirely offline.
+
+As for a key — the Community edition needs none at all. The commercial editions
+come with a **license file** installed on the instance and renewed each year with
+the subscription; it is validated locally, so an air-gapped deployment renews by
+dropping in a new file and nothing is ever checked against our servers.
+
+That file is the one thing a commercial edition does need, and it is worth
+stating plainly. What obserae does not have, and will not have, is an *online*
+mechanism: no account, no activation server, no remote check, no kill-switch. A
+license here is a file you hold, sitting next to your configuration.
 
 ## What happens if the project stops, or Spartan Conseil disappears?
 
 Your installation keeps working. There is **no remote kill-switch and no license
-check to fail**, so an installed copy keeps running with no internet and no
+server to fail**, so an installed copy keeps running with no internet and no
 contact with anyone. The license text and binaries are bundled locally, and your
 data stays yours.
+
+Beyond that, the EULA commits in writing (art. 8.3): should Spartan Conseil
+permanently cease its activity, or should obserae be permanently discontinued,
+**the source code of the complete Enterprise edition — every feature included —
+will be released under an open source license** allowing users to keep using,
+maintaining and evolving it, and the already-published builds stay available for
+download. The proprietary license is there to fund a coherent product, not to
+strand the people who chose it.
 
 ## Can I modify, redistribute or reverse-engineer it?
 
 No (EULA art. 5) — beyond the non-waivable interoperability rights French law
 grants under art. L122-6-1 of the Intellectual Property Code. Spartan Conseil is
-the sole authorised distributor, through its official channels only
-(`github.com/spartan-conseil/obserae` and `ghcr.io/spartan-conseil/obserae`).
+the sole authorised distributor, through obserae's official public distribution
+endpoints.
 
 ## Can I contribute code?
 
 No — obserae does not accept code contributions, and that is deliberate: a single
 owner keeps the intellectual property clean and the project's direction coherent.
 **Issues are very welcome**, though — bug reports, reproduction cases and feature
-suggestions genuinely help. Open them at
-<https://github.com/spartan-conseil/obserae/issues>.
+suggestions genuinely help. Send them to <support@spartan-conseil.fr>.
 
 ## Is there support or an SLA?
 
@@ -162,5 +184,5 @@ In the repository and in every release / Docker image:
 - `EULA.en.txt` — English, courtesy translation (the French version prevails in
   case of conflict).
 
-Online copy: <https://github.com/spartan-conseil/obserae/blob/main/EULA.txt>.
+Online copy: <https://obserae.com/eula/EULA.txt>.
 Commercial licensing: <licensing@spartan-conseil.fr>.

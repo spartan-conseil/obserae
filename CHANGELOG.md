@@ -1,10 +1,370 @@
 # Changelog
 
-A high-level history of obserae, newest first. obserae is in **alpha** (pre-1.0):
-it moves fast and every feature is open during the alpha. Dates are release
-dates; binaries and Docker images for each version are on the
-[releases page](https://github.com/spartan-conseil/obserae/releases). This is a
+A high-level history of obserae, newest first. obserae is in **beta** (pre-1.0)
+and running in production at early-adopter sites: every feature is open during
+the beta. Dates are release dates. This document is published as the dedicated
+[Changelog](https://obserae.com/docs/changelog/) page on obserae.com. It is a
 bird's-eye view, not an exhaustive commit log.
+
+## [0.33.0] — 2026-08-05
+
+Two themes. **Restitution**: obserae now produces the document you hand to an
+auditor. **Response**: an alert now carries enough context, identity and
+lifecycle for a SOAR to act on it without asking three follow-up questions.
+
+### Added
+
+- **Reports.** A new *Analysis → Reports* page turns a time window into a
+  document you can read, keep, download or send on. **Operations** opens on what
+  your network *is* — networks, hosts, services, NAT rules and declared flows,
+  with the map drawn from your cartography at the positions, colours and groups
+  you arranged — then covers what the detection engine emitted. **Compliance**
+  reports which of the controls your installed rule sets claim to instrument
+  really have a rule that is enabled and being evaluated, against NIS 2, DORA,
+  SOC 2, ISO/IEC 27001, CIS Controls and MITRE ATT&CK, and closes on a rule
+  annex giving each rule's condition in words, its remediation and the exact
+  NFQL the detection executes — paste it into Investigation and see for yourself
+  what a control is watching.
+
+  It also says what it cannot prove: the control catalogue comes from the rule
+  sets you have installed, so obserae never claims to know how many controls a
+  framework contains, and a control with a live rule and no alert during the
+  window is reported as **covered** — a clean period, never a gap.
+
+  Every report is a print-ready PDF and a self-contained HTML file, in **English
+  or in French**, chosen per report; names — frameworks, controls, your hosts and
+  rules — are never translated, because they are what an auditor matches against
+  their own paperwork. Reports also run unattended: a job fires daily, on chosen
+  weekdays or on a day of the month (*the 31st* lands on a short month's last
+  day) and mails the PDF to an SMTP destination. Each job carries its own
+  **Reports to keep**, so a quarterly compliance pack survives a chatty daily
+  report; the store as a whole keeps 200 reports, 180 days, 512 MB.
+
+- **Alerts now carry their context, and an identity that survives a rename.** An
+  alert used to hand a SOAR two bare IP addresses. It now says that `10.0.0.50`
+  is `ci-runner-prod` of group `build`, that the destination is **not covered by
+  any Flow Matrix rule**, and that the public address involved is listed by a
+  threat feed, with the date that feed last refreshed — plus its ASN,
+  organisation, country and cloud provider. That is three follow-up API calls a
+  playbook no longer has to make. The context is **frozen at the moment the rule
+  fired**, so a delivery retried an hour later re-ships the original reading, and
+  it **never delays a notification**: if the lookups run long, the alert leaves
+  on time with whatever was resolved. Tune it with `outputs.entities`
+  (`full` / `carto` / `off`) and `outputs.max_entities`.
+
+  The payload is now a named contract, **`obserae.alert/2`**. Matched rows arrive
+  as objects instead of positional arrays, so a playbook keyed on `detail[0]` can
+  no longer break silently when someone edits a rule's `KEEP`; each alert carries
+  the NFQL and `as_of` that produced it, so posting them back to `/api/query`
+  returns the same rows; and rules gain a **stable identifier** that survives
+  renaming and is the same on every obserae running the same pack.
+  `outputs.sample_rows` caps the evidence rows, `instance_name` labels the
+  deployment, and your own instance publishes the schema at
+  `GET /api/schemas/alert/2`.
+
+  **Nothing migrates on its own.** Outputs that already exist keep receiving the
+  exact bytes they always did; new ones default to v2, and a legacy output shows
+  a before/after preview and a one-click switch.
+
+- **Alerts can be sent in your SIEM's own language: ECS, OCSF or Splunk CIM.** An
+  Elasticsearch index full of obserae's own field names supports no Elastic
+  Security dashboard and no detection rule. An Elasticsearch output can now write
+  **ECS**, so Elastic's network views populate and rules keying on `source.ip`
+  keep working; a webhook or Splunk HEC output can send an **OCSF Detection
+  Finding (class 2004)**, which Microsoft Sentinel, Google SecOps and AWS
+  Security Lake ingest natively. The complete obserae alert travels along either
+  way, so the matched rows and the entity block are still there as evidence. A
+  **Splunk add-on** maps alerts onto the CIM Alerts and Network Traffic models,
+  and the index template an Elastic cluster needs is served by your instance at
+  `GET /api/integrations/elastic/template` — apply it before the first alert, as
+  a mapping Elasticsearch guessed does not fail loudly, it just makes some
+  queries return nothing.
+
+  **No existing output changes shape**: only a newly created Elasticsearch output
+  starts in ECS, and moving an index already mapped one way means a reindex, so
+  the recommended path is a new one.
+
+- **Eight new destinations.** **GLPI** opens a ticket in the helpdesk that is
+  everywhere in French SMEs and served by no security vendor. **Jira** opens an
+  issue, on Cloud or on Server / Data Center, and stops there — no polling, no
+  status write-back. **Microsoft Sentinel** writes OCSF into a custom
+  `Obserae_CL` table through the Logs Ingestion API. **MISP** publishes the
+  publicly routable addresses an alert saw, with sharing defaults that are
+  decisions rather than accidents: your organisation only, `to_ids` off, no
+  immediate publication, private addresses never sent. **TheHive 5** creates a
+  SIRP alert whose addresses arrive as typed **observables** carrying their
+  cartography name, group and threat-intel verdicts. **Microsoft Teams** posts an
+  Adaptive Card to a Workflows webhook or a MessageCard to a legacy Office 365
+  connector — a visible setting, because the wrong shape does not fail, Teams
+  just renders nothing. **Discord** posts a card to a channel webhook, and
+  **ntfy** publishes to a topic, self-hosted or on ntfy.sh.
+
+- **Connectors for Shuffle, n8n and Cortex XSOAR, and recipes for four more
+  platforms.** They live under `integrations/`, alongside the Splunk add-on, and
+  each declares the **contract** it targets — `obserae.alert/2`, SOAR profile
+  `1.0.0` — never an obserae release number, because a connector pinned to a
+  release is wrong within a quarter and wrong silently. The Shuffle app is the
+  SOAR specification itself, imported. The n8n node has both halves: eight
+  actions and a webhook trigger that verifies the alert signature and refuses to
+  run with no secret configured. The Cortex XSOAR pack ships three commands and a
+  segmentation-triage playbook that asks the Flow Matrix first, since a
+  conversation the matrix already allows is a tuning ticket rather than an
+  incident. **Tines**, **Torq**, **Sentinel (Logic Apps)** and **TheHive +
+  Cortex** are documented as recipes — a webhook, a signature check, a few HTTP
+  calls, nothing to install.
+
+- **A page for the engineer wiring obserae into a SOAR.** Everything needed to
+  build an *alert → enrichment → ticket* playbook is now in one document,
+  [Response Integrations](https://obserae.com/docs/integration), written for
+  someone who has never seen obserae: the alert contract field by field, how to
+  verify a webhook signature in Python or in Go, the SOAR profile's operations,
+  three end-to-end reference playbooks, and what leaves the instance in each
+  direction — the question a security officer asks before approving an outbound
+  destination. It also states plainly, because it is the first thing asked, what
+  obserae does not do: it is out-of-band and blocks nothing, there is no firewall
+  API here, and turning it off cannot break connectivity.
+
+- **A SOAR profile of the API, typed enough to generate a connector from.** The
+  OpenAPI document described 220 operations, and 224 of their responses were
+  declared as "a JSON object" or "a JSON array" — which tells a code generator
+  nothing, and left an integrator reverse-engineering the data model from
+  examples. The fourteen
+  operations a playbook actually calls are now fully typed, each with a response
+  example, and ship as their own document, **`openapi-soar.yaml`**, which your
+  instance serves at `GET /api/openapi-soar.yaml`: importing it produces fourteen
+  actions rather than 220, and it is derived from the full specification so the
+  two cannot disagree. `GET /api/alerts` also gained the filters an automation
+  needs — `rule_id` (stable across renames), `tag`, `until`, `offset` — and now
+  answers `{items, total, limit, offset}` instead of a bare array, `total` being
+  what lets a client that pages know when to stop. The base URL is no longer
+  hard-coded to loopback.
+
+- **Five answers a playbook needs, without writing a query.**
+  `GET /api/context/host` returns who a host talked to, who talked to it, what it
+  served, how much it moved and which peers are new — each peer carrying the Flow
+  Matrix's verdict on that exact conversation. `POST /api/context/peers` narrows
+  the same question by direction, scope and count. `POST /api/policy/check` says
+  whether a conversation was supposed to be allowed, names the covering rule, and
+  when the answer is no, `nearest_rules` says what would have to change — `port
+  not in rule`, `protocol mismatch`, `source not in scope`, `destination not in
+  scope` — a closed list an integration can switch on, where `{"covered": false}`
+  alone was never something an analyst could put in a ticket.
+  `GET /api/enrichment/lookup` returns what obserae knows about an address, up to
+  50 in one call. And `GET /api/alerts/{id}` and `GET /api/carto/hosts/{name}`
+  read one alert or one asset back by id or name — often all a webhook body or a
+  ticket field carries.
+
+  The context endpoints take an `as_of` instant, so a playbook can place itself
+  where the alert fired instead of where the network is now. The enrichment
+  lookup keeps three answers distinct, and an integration should not collapse
+  them: `threat_intel: []` means checked and unlisted, an absent `threat_intel`
+  means not checked, and `{"verdict": "unavailable"}` means the database could
+  not be consulted. Only the first means "clean".
+
+- **An indicator feed a firewall can pull — obserae publishes a list, something
+  else acts on it.** `GET /api/indicators` exposes the publicly routable
+  addresses obserae's own detection rules fired on, as `plain` (one address per
+  line, what a firewall or an RPZ ingests), `json`, `csv` or a `misp` manifest.
+  Private addresses are never published — an RFC1918 line in a list something
+  acts on would have someone cut off their own network. An address is one
+  indicator however many alerts saw it, carrying the highest severity any of them
+  gave it and the rules that saw it, which is the provenance a human needs before
+  acting on such a line. It has its own permission, `indicators:read`, in no
+  built-in group but `admin`, so the device polling it can hold that and nothing
+  else, and it answers `ETag`, `Last-Modified` and `304 Not Modified`.
+
+- **The complete documentation now ships inside obserae.** A new *Tools* section
+  carries the whole product manual, rendered offline from the binary: an index,
+  full-text search, per-page contents and working cross-links. Nothing is fetched
+  from the internet, so an air-gapped install has exactly the same manual as any
+  other. Every page in the GUI also gained a `?` in the top bar that opens the
+  section covering it — Investigation opens NFQL, Cartography opens Cartography,
+  Devices opens the device connectors.
+
+- **A sizing calculator.** *Tools → Sizing* turns a flow rate, a session ratio
+  and a retention policy into the disk, backup volume, memory and CPU a
+  deployment needs, with the full per-store breakdown. Every number says where it
+  came from — measured on a real production instance, estimated, or read from
+  your own deployment — and the page says which figures have never been measured
+  against a known flow rate rather than presenting a guess as a fact. On a
+  running instance, **Use my instance** substitutes the coefficients your own
+  data produces.
+
+- **Reads made by an API token are now in the audit log.** Mutations and refusals
+  were recorded, but a successful *read* left no trace, so "which automation
+  queried what, and what came back" was a question the journal could not answer.
+  Each call by a Bearer token to a SOAR-profile operation now leaves an entry
+  carrying the operation, the permission that admitted it and the status code.
+  Browser sessions are excluded on purpose: a page refreshing every few seconds
+  would bury the trail an auditor came for. The entry format is unchanged, so a
+  journal spanning this upgrade still verifies.
+
+### Changed
+
+- **Incidents now close by themselves — a behaviour change for anyone already
+  routing to PagerDuty or Opsgenie.** Until now obserae only ever *opened* an
+  incident: nothing resolved it, so the on-call engineer closed by hand and, in
+  our experience, stopped trusting the integration inside a fortnight.
+
+  An alert now opens an incident and closes it once the rule has come back clean
+  three times in a row (`alerts.resolve_after_evaluations`, 1–20) — three rather
+  than one because a condition that comes and goes would otherwise open and close
+  an incident on every other tick. The alert also reaches **closed** in obserae,
+  so the GUI and the SOAR agree, and acknowledging an alert here now reaches the
+  destinations too: a SOAR no longer pages for an alert a human has taken. A
+  heartbeat rule works the other way round, as it should — it fires when its
+  query empties, so it closes when the data comes back.
+
+  **Deduplication moved off the rule name.** PagerDuty's `dedup_key` and
+  Opsgenie's `alias` were the rule's name, so renaming a firing rule opened a
+  *second* incident and left the first open forever, and a group-by rule
+  collapsed every entity onto one incident. Both now key on an identity built
+  from your instance, the rule's immutable id and the alert's group key: renaming
+  is free, a rule grouped by IP opens one incident per IP, and two obserae
+  installations feeding one SOAR can no longer close each other's incidents.
+
+  Resolutions are **on by default** for PagerDuty, Opsgenie, webhook, syslog,
+  Splunk and Elasticsearch, and **off** for Slack, Mattermost, Telegram, Gotify
+  and email, where a "resolved" message doubles the noise for the person reading
+  it. Flip either with **Send lifecycle events** on the output. The trigger
+  message is untouched in every case, and a resolution carries no matched rows on
+  purpose: the condition is gone, so those rows would be stale evidence rather
+  than proof of a resolution.
+
+- **Four documented API responses corrected.** Each was documented as something
+  the server does not send, so a client written from the specification would have
+  failed on its first call while the document looked correct — listed
+  individually because each is a breaking correction for anyone who trusted the
+  old text:
+
+  - `GET /api/alerts` was declared as a JSON array; it has always returned an
+    object, now `{items, total, limit, offset}`.
+  - `GET /api/carto/search` was declared as a JSON array; it has always returned
+    `{query, matches}`.
+  - `POST /api/alerts/{id}/status` was declared as `200` with a body; it returns
+    **`204 No Content`**, and its status vocabulary is `new` / `ack` / `closed` —
+    the documented example used a value the server rejects.
+  - `DELETE /api/alerts/{id}` was declared as `200` with a body; it also returns
+    **`204 No Content`**.
+
+  Two of those responses also returned `null` instead of an empty array when
+  nothing matched. They no longer can.
+
+- **obserae is in beta, not alpha.** The product runs in production at
+  early-adopter sites, on real traffic, day after day, while the documentation
+  still described an alpha to be factored into a risk analysis. The published
+  project status is now *beta, in production at early-adopter sites*, and the FAQ
+  explains why an off-path collector is a reasonable thing to run in production
+  before 1.0.
+
+- **The EULA commits to open-sourcing obserae if it ever stops** (art. 8.3,
+  French and English, EULA 1.1). Should Spartan Conseil permanently cease its
+  activity or obserae be permanently discontinued, the source code of the
+  complete Enterprise edition — every feature included, not a stripped-down
+  core — is released under an open source licence letting users keep using,
+  maintaining and evolving it, and the already-published builds stay
+  downloadable. The licence also states what was until then only a design
+  property: there is no remote deactivation mechanism, so an installed instance
+  keeps running with the vendor entirely out of the picture. The wording on
+  editions is more precise as well: Community needs no licence key at all, a
+  commercial subscription ships a licence file renewed each year, and neither is
+  ever checked against our servers — validation is local, so an air-gapped
+  deployment renews by dropping in a new file.
+
+- **Downloads and legal pages stay on obserae's own endpoints.** Downloads go
+  through `get.obserae.com`, Docker Compose is fetched by the same installer, and
+  legal, support and security links remain on `obserae.com` instead of sending
+  readers to the distribution repository.
+
+### Fixed
+
+- **Rule packs asked for the wrong permission.** Every rule-pack route —
+  installing, toggling, deleting a pack, and the vocabulary the cartography
+  editor's dropdowns read — was gated on the **Flow Matrix** permissions instead
+  of the alerting ones, so a user holding `alerting:write` but not `rules:write`
+  could not install a detection pack. The routes now carry the permissions their
+  own documentation always claimed. If you built a group around installing rule
+  packs, check that it holds `alerting:read` / `alerting:write`.
+
+- **Asking whether a flow is allowed required permission to change it.**
+  `POST /api/rules/find-covering` modifies nothing but required `rules:write`
+  purely because it is a `POST`; it now needs only `rules:read`, so an automation
+  can check a flow before opening a ticket without being trusted to edit the
+  matrix. The same reasoning governs the new `/api/enrichment/lookup`, which
+  requires `sessions:read` rather than the `sources:manage` that covers the rest
+  of `/api/enrichment`: reading what the feeds say is a read, configuring the
+  feeds is not.
+
+- **ASN badges came back empty.** The upstream that publishes the IP-to-network
+  mapping began refusing one of its two files, and because the source refuses a
+  half-loaded picture, that one refusal left obserae with no autonomous-system
+  attribution at all — no `AS13335 CLOUDFLARENET` in host drawers, hover tooltips
+  or NFQL. obserae now reads the publisher's single combined table, which covers
+  IPv4 and IPv6 together and is served normally, and asks "has this changed?"
+  before downloading, so *Refresh* no longer pulls roughly 9 MB when nothing
+  moved.
+
+- **A first start no longer requires laying the data directory out by hand.**
+  Pointing obserae at a directory that did not exist yet — or at a database path
+  in a sub-directory of its own, which is what the systemd and Docker layouts
+  do — failed on an `IO Error: Cannot open file` naming neither the setting at
+  fault nor the missing directory. The daemon now creates the data directory and
+  the directory holding the database file on first start. Existing directories
+  are left alone, permissions included, so a data area an installer hardened
+  stays hardened, and the `mkdir -p` steps are gone from the installation and
+  operations guides.
+
+- **A schema migration could leave the database impossible to open.** A
+  migration's schema changes reached the write-ahead log first and the database
+  file only at the next checkpoint; an unclean shutdown in between — a `kill -9`,
+  a power cut, an OOM — forced DuckDB to replay them at the next start, which
+  hits an open DuckDB bug and aborts. The daemon then refused to start, with a
+  stack trace and no obvious way back. A migration now folds its changes into the
+  database file before declaring itself done, so no restart has to replay them.
+  Recovery for a data directory already in this state is in the migrations guide.
+
+- **A checkpoint that had stopped working said nothing.** Every ten minutes
+  obserae folds its write-ahead log into the database file. A failure was logged
+  as a warning and retried, which is right for a hiccup and wrong for a daemon
+  that has not managed a single checkpoint in hours — the log then grows without
+  bound and every write since the last success depends on being replayed at the
+  next start. One production instance ran thirteen hours in that state.
+  *Monitoring* now has a **Checkpoint (WAL)** panel: checkpoints completed, how
+  long ago the last one succeeded, and after three consecutive failures a banner
+  carrying the reason and what it costs.
+
+- **The Assistant now finds the right documentation page.** A question naming a
+  topic could miss the page devoted to it: asking about NFQL did not return the
+  NFQL guide at all, and asking about NAT returned the NFQL page instead. The
+  documentation search now ranks the page whose subject matches the question.
+
+- **A configuration export now carries the whole configuration.** Restoring a
+  bundle used to come back without the AI providers, without the NAT page's
+  switches and decisions, and without the alert-journal retention — those areas
+  had never been part of the exported file. They are now: provider endpoints and
+  settings, including the API key encrypted with the instance master key; the
+  Assistant's monthly budgets, named by user so the bundle travels between
+  instances; the two NAT detection switches with the translations you invalidated
+  and the proposals you dismissed; and the alert-journal retention. A bundle also
+  carries each output's payload format, so restoring one no longer silently
+  reverts every destination to the legacy alert.
+
+- **The Assistant no longer imposes a silent limit.** A conversation used to hold
+  400 messages and then close for good; unopened conversations were deleted after
+  90 days; and opening a new one past the 200th quietly deleted your oldest. All
+  three are gone. Keep one thread for as long as it is useful — compression
+  already summarises the oldest turns so a long conversation stays affordable —
+  and the only thing that removes a conversation is your own Delete button. Your
+  monthly budget and the per-message limits are unchanged: those bound what the
+  daemon spends on your behalf, not what you write.
+
+- **Documentation corrections.** Seven cross-references pointed at headings that
+  had been renamed — into the NFQL guide's table reference, its error section and
+  its cross-table lookups, and into the session tuning section — and were broken
+  on the published site too. The sizing guide also said retention was off by
+  default, which is true of the code defaults and false of the `obserae.yaml` the
+  installer, the tarball and the Docker image actually deploy; the page now says
+  both.
 
 ## [0.32.0] — 2026-07-27
 

@@ -2,7 +2,7 @@
 # =============================================================================
 #  obserae installer — one-liner bootstrap (production systemd deployment)
 # -----------------------------------------------------------------------------
-#  Install obserae (daemon + admin CLI) from the latest signed GitHub release:
+#  Install obserae (daemon + admin CLI) from the latest signed release:
 #
 #      curl -fsSL https://get.obserae.com | sudo sh
 #
@@ -22,9 +22,12 @@ set -eu
 # --- Configuration (override via environment) --------------------------------
 REPO_OWNER="${REPO_OWNER:-spartan-conseil}"
 REPO_NAME="${REPO_NAME:-obserae}"
+REPO_REF="${REPO_REF:-main}"                 # branch or tag used for distribution files
 VERSION="${VERSION:-latest}"                 # "latest" or a tag like v0.27.0; also --version
 BIN_DIR="${BIN_DIR:-/usr/local/bin}"         # where the binaries go; also --bin-dir
 INSTALL_URL="${INSTALL_URL:-https://get.obserae.com}"
+COMPOSE_DIR="${OBSERAE_COMPOSE_DIR:-./obserae-compose}"
+DISTRIBUTION_BASE="${DISTRIBUTION_BASE:-https://raw.githubusercontent.com/$REPO_OWNER/$REPO_NAME/$REPO_REF/docs-github/docker-compose}"
 
 # systemd deployment paths (match obserae.com/docs/operations)
 CONF_DIR="/etc/obserae"
@@ -80,20 +83,23 @@ Usage (remote):
 
 Commands:
   install      Download, verify and deploy obserae as a systemd service (default)
+  compose      Download the supported Docker Compose + Caddy bundle
   uninstall    Stop and remove the service and binaries (--purge also wipes data)
   help         Show this help
 
 Options:
   --version REF        Release tag to install (default: latest), e.g. v0.27.0
   --bin-dir PATH       Where to install the binaries (default: /usr/local/bin)
+  --compose-dir PATH   Where to write the Compose bundle (default: ./obserae-compose)
   --verify-provenance  Also verify the SLSA build-provenance attestation (needs cosign)
-  --download-only      Download and verify the release, then stop (no install; no root)
+  --download-only      Save and verify the release in the current directory (no root)
   --strict             Fail if cosign is missing or any signature/provenance check fails
   --purge              uninstall: also delete $DATA_ROOT, $CONF_DIR and the '$SVC_USER' user
   --yes, -y            Assume "yes" for confirmations (non-interactive purge)
 
 Environment overrides:
-  VERSION, BIN_DIR, REPO_OWNER, REPO_NAME, INSTALL_URL
+  VERSION, BIN_DIR, OBSERAE_COMPOSE_DIR, REPO_OWNER, REPO_NAME, REPO_REF,
+  INSTALL_URL, DISTRIBUTION_BASE
 EOF
 }
 
@@ -101,12 +107,14 @@ EOF
 parse_args() {
   while [ $# -gt 0 ]; do
     case "$1" in
-      install|uninstall)   [ -z "$CMD" ] && CMD="$1" || true ;;
+      install|compose|uninstall) [ -z "$CMD" ] && CMD="$1" || true ;;
       help|-h|--help)      CMD="help" ;;
       --version)           shift; [ $# -gt 0 ] || die "--version needs a value"; VERSION="$1" ;;
       --version=*)         VERSION="${1#--version=}" ;;
       --bin-dir)           shift; [ $# -gt 0 ] || die "--bin-dir needs a path"; BIN_DIR="$1" ;;
       --bin-dir=*)         BIN_DIR="${1#--bin-dir=}" ;;
+      --compose-dir)       shift; [ $# -gt 0 ] || die "--compose-dir needs a path"; COMPOSE_DIR="$1" ;;
+      --compose-dir=*)     COMPOSE_DIR="${1#--compose-dir=}" ;;
       --verify-provenance) VERIFY_PROV=1 ;;
       --download-only)     DOWNLOAD_ONLY=1 ;;
       --strict)            STRICT=1 ;;
@@ -264,8 +272,10 @@ setup_service() {
     priv useradd --system --home "$DATA_ROOT" --shell /usr/sbin/nologin "$SVC_USER"
   fi
 
-  priv install -d -o "$SVC_USER" -g "$SVC_USER" -m 0750 \
-    "$DATA_ROOT" "$DATA_ROOT/data" "$DATA_ROOT/db" "$DATA_ROOT/run"
+  # Only the root: /var/lib belongs to root, so the service account needs to own
+  # something before it can write. obserae creates data/, db/ and run/ (and the
+  # per-store directories) on its first start.
+  priv install -d -o "$SVC_USER" -g "$SVC_USER" -m 0750 "$DATA_ROOT"
 
   if [ ! -f "$CONF_FILE" ]; then
     info "Writing default config to $CONF_FILE…"
@@ -391,12 +401,36 @@ cmd_install() {
   verify_checksum
   verify_signature
   if [ "$DOWNLOAD_ONLY" = "1" ]; then
-    ok "Verification complete — release '$VERSION' (linux/$ARCH) is intact. Not installing (--download-only)."
+    _files="$tarball checksums.txt checksums.txt.sig checksums.txt.pem"
+    [ "$VERIFY_PROV" = "1" ] && _files="$_files provenance.intoto.jsonl"
+    for _file in $_files; do
+      [ ! -e "./$_file" ] || die "refusing to overwrite ./$_file; move it or run from an empty directory"
+    done
+    for _file in $_files; do cp "$_tmpdir/$_file" "./$_file"; done
+    ok "Verification complete — release '$VERSION' (linux/$ARCH) saved to $(pwd -P)."
     return 0
   fi
   install_binaries
   setup_service
   print_next_steps
+}
+
+cmd_compose() {
+  detect_downloader
+  have mktemp || die "mktemp is required."
+  have install || die "install is required."
+  [ ! -e "$COMPOSE_DIR/docker-compose.yml" ] && [ ! -e "$COMPOSE_DIR/Caddyfile" ] \
+    || die "refusing to overwrite an existing Compose bundle in '$COMPOSE_DIR'"
+  _tmpdir="$(mktemp -d)"
+  dl "$DISTRIBUTION_BASE/docker-compose.yml" "$_tmpdir/docker-compose.yml" \
+    || die "failed to download docker-compose.yml"
+  dl "$DISTRIBUTION_BASE/Caddyfile" "$_tmpdir/Caddyfile" \
+    || die "failed to download Caddyfile"
+  install -d -m 0755 "$COMPOSE_DIR"
+  install -m 0644 "$_tmpdir/docker-compose.yml" "$COMPOSE_DIR/docker-compose.yml"
+  install -m 0644 "$_tmpdir/Caddyfile" "$COMPOSE_DIR/Caddyfile"
+  ok "Docker Compose bundle saved to $COMPOSE_DIR"
+  info "Start it with:  cd $COMPOSE_DIR && docker compose up -d"
 }
 
 cmd_uninstall() {
@@ -428,6 +462,7 @@ main() {
   parse_args "$@"
   case "$CMD" in
     install)   cmd_install ;;
+    compose)   cmd_compose ;;
     uninstall) cmd_uninstall ;;
     help)      usage ;;
     *)         usage; exit 1 ;;

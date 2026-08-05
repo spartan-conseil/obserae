@@ -38,7 +38,7 @@ reports and will gladly acknowledge you publicly if you wish.
 
 ## Supported versions
 
-obserae is in **alpha** (pre-1.0). Security fixes land on the **latest release
+obserae is in **beta** (pre-1.0). Security fixes land on the **latest release
 only**, and ship as a new release rather than a patch to an older one — please
 reproduce on the most recent version before reporting.
 

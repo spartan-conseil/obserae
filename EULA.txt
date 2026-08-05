@@ -2,7 +2,7 @@
 CONTRAT DE LICENCE UTILISATEUR FINAL (EULA) - OBSERAE
 ================================================================================
 
-Version 1.0 - 19/05/2026
+Version 1.1 - 28/07/2026
 
 Editeur : Spartan Conseil Cybersecurite (ci-apres designee
 "Spartan Conseil", son nom commercial), SARL de droit francais.
@@ -222,6 +222,17 @@ de l'Utilisateur.
      de niveau de service (SLA) et les developpements specifiques
      relevent exclusivement des contrats de licence commerciale conclus
      avec Spartan Conseil.
+
+8.3. En cas de cessation definitive d'activite de Spartan Conseil ou
+     d'arret definitif du Logiciel, Spartan Conseil s'engage a publier
+     le code source du Logiciel dans sa version la plus complete
+     (edition Enterprise), toutes fonctionnalites incluses, sous une
+     licence libre permettant aux Utilisateurs de poursuivre son
+     utilisation, sa maintenance et son evolution. Les binaires et
+     images des versions deja publiees demeureront accessibles au
+     telechargement. Le Logiciel ne comporte aucun mecanisme de
+     desactivation a distance : une installation existante continue de
+     fonctionner sans intervention de Spartan Conseil.
 
 
 9. GARANTIE - LIMITATION

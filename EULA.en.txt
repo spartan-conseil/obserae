@@ -2,7 +2,7 @@
 END-USER LICENSE AGREEMENT (EULA) - OBSERAE
 ================================================================================
 
-Version 1.0 - 05/19/2026
+Version 1.1 - 07/28/2026
 
 Publisher: Spartan Conseil Cybersecurite (hereinafter referred to as
 "Spartan Conseil", its commercial name), a French SARL governed by
@@ -217,6 +217,17 @@ EULA and will require a new acceptance by the User.
 8.2. Technical support, priority fixes, service-level commitments
      (SLA) and custom development are governed exclusively by
      commercial license agreements entered into with Spartan Conseil.
+
+8.3. Should Spartan Conseil permanently cease its activity, or should
+     the Software be permanently discontinued, Spartan Conseil
+     undertakes to release the source code of the Software in its most
+     complete version (Enterprise edition), all features included,
+     under an open source license allowing Users to continue using,
+     maintaining and evolving it. The binaries and images of the
+     versions already published will remain available for download.
+     The Software contains no remote deactivation mechanism: an
+     existing installation keeps working without any action from
+     Spartan Conseil.
 
 
 9. WARRANTY - LIMITATION

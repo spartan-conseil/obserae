@@ -12,7 +12,7 @@ requests are closed with a pointer to this page; please don't take it personally
 ## Issues are very welcome
 
 Bug reports, reproduction cases and feature suggestions genuinely help. Please
-open them at <https://github.com/spartan-conseil/obserae/issues>.
+send them to <support@spartan-conseil.fr>.
 
 ## Source access & licensing
 

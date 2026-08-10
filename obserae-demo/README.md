@@ -177,9 +177,11 @@ Prefer clicking? The UI does the same: **Settings → Master key**
 modal → *Import*, then **Import config**. Either way, once it finishes the
 **Cartography**, **Flow Matrix** and **Rules** pages are already populated — every
 rule and NFQL query can refer to assets by name (`host:prod-db`, `group:work-grp`,
-`network:PROD`, `internet4`, …). The bundle also carries the LDAP settings, so with
-the master key in place the bind password works out of the box (§5 only has to
-provision FreeIPA itself).
+`network:PROD`, `internet4`, …). The bundle deliberately carries **no LDAP settings**: FreeIPA
+generates a fresh CA on every first boot, so a certificate frozen in a shipped
+bundle could only ever be the wrong one. `scripts/setup-ldap.sh` (§5) owns that
+configuration and writes it from the CA it just exported — which also means this
+bundle is safe to import at any time, before or after you set LDAP up.
 
 > **Demo login — `admin` / `admin`.** Yes, both. 🙈 It's the password a
 > brute-forcer cracks before its coffee cools — and that's the point: this lab is
@@ -224,7 +226,11 @@ the UI (http://127.0.0.1:8081) with:
 | `carol` | `Demo12345` | auditor |
 
 The local **admin** account keeps working as a break-glass login even if FreeIPA
-is unreachable. LDAP users appear on the **Users** page marked as LDAP accounts;
+is unreachable.
+
+Nothing here depends on the configuration bundle of §4: the lab is meant to be
+explored either way — empty, so you build the cartography yourself, or
+preloaded. LDAP works in both cases, and in any order. LDAP users appear on the **Users** page marked as LDAP accounts;
 their roles come from FreeIPA group membership and refresh on every login.
 
 > FreeIPA is heavy: it runs systemd and provisions a CA on first boot, which can

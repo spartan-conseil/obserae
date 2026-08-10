@@ -565,49 +565,14 @@ users:
       active: true
       groups:
         - analyst
-  ldap:
-    enabled: true
-    url: ldaps://ipa.corp.lan:636
-    root_ca: |-
-      -----BEGIN CERTIFICATE-----
-      MIIERDCCAqygAwIBAgIBATANBgkqhkiG9w0BAQsFADAzMREwDwYDVQQKDAhDT1JQ
-      LkxBTjEeMBwGA1UEAwwVQ2VydGlmaWNhdGUgQXV0aG9yaXR5MB4XDTI2MDcwNTE1
-      NDczMVoXDTQ2MDcwNTE1NDczMVowMzERMA8GA1UECgwIQ09SUC5MQU4xHjAcBgNV
-      BAMMFUNlcnRpZmljYXRlIEF1dGhvcml0eTCCAaIwDQYJKoZIhvcNAQEBBQADggGP
-      ADCCAYoCggGBAKO0lvaBikbU2X6Ghvpo8szcIv7Ba7ZP5p6hD7Pcz2xcKc8Nmk2W
-      m1YRawdMW8aiEuaGE1giGpmNp7R2FL2Lutl9BCHeFmOuqvzp255hyXDONLFikkI/
-      1Z23xhlx0yIo03nxHhWQh/uujLfVubdBdu8zeZzUhatTQGjBO38LAuFkD2sfQJLA
-      e9rv0hcKLm7JpAjDemsGmHB33xr6RldsYeWhdCjxTJkTsafiIAm6MVgFms4GDPgX
-      2j2onvSKPnB8FyxzTKsE+5/Kcv0Rd+d3Sh85lfCm1+obfLuBx822IvzvJEhb5kLs
-      P4ox6xzp8/rA8kbqp/U4CDNHCjH0NxcvSHSqFal5RqAadsUTHcVKwL3pQqUis5DO
-      VcO9LR2WJgPDUrzm+QUZiLdGzOIgBIMNgCK1wcloYtTmbT79yGriG+dhM2gHlpPb
-      mc9EPtNILCr52i1JD2XbjY4kxW7TziTeBNi28snyHNNRhJx7X8m/6XnFRQz3fWCd
-      /9wJxuhSIczaGwIDAQABo2MwYTAdBgNVHQ4EFgQUCk9amCndMkPZOhGmraSCuHhq
-      fqswHwYDVR0jBBgwFoAUCk9amCndMkPZOhGmraSCuHhqfqswDwYDVR0TAQH/BAUw
-      AwEB/zAOBgNVHQ8BAf8EBAMCAcYwDQYJKoZIhvcNAQELBQADggGBADbVo6PtjgbQ
-      2xaHkyblkxk1E2SylvEkYFRnGWfcG7giY/g/N+8FBYWPkAcE8GKRi399edgEjX83
-      7Wc8pr/nrx8Eu3/2J2pq6ICSs+uFJN8xJ5Jf9qvrJ0+fAhj7jkmu/VmRfR53TpJQ
-      b8HuPVUDNGUXXoiK1OBKAJDIxMz+eRw5ilWS0IxxtEjXDMn4fwidvtxgtylOE9po
-      oUizgWZ+L6ngH0hBei6+SLPcgWQ5xuBg0PCWu2WNJrzdZBw42YhkgvJAzMAmGWo2
-      K64b+Mpey/jhYcEvIkN1YIvXxk6pxRD31xYBQlclHVD6efrXQlBmF1t/AF14oczx
-      7BfFgLg2d4OPBVptYh+RD+PA933O4qrPOxU9X+ZTzEfKncpyvFp2I9TnasuJKlaK
-      F6UPHYlNxpr7we11pb7WQ0K1PQuUgQ/lDuEGkaAx+0Xi3zWKG4qsq2vsq158S4CY
-      L8D8RYCi/tr+of+DshVTDisutLGPAc2KiqhNAcI4BjUm05Mvn6+8NA==
-      -----END CERTIFICATE-----
-    bind_dn: uid=svc-obserae,cn=sysaccounts,cn=etc,dc=corp,dc=lan
-    bind_password: enc:v1:mzDm5Cs4h1EIEN1JcD6ouG2V5Zs1ayDRqqdmZ14yQqgkpYw92XwW
-    user_base_dn: cn=users,cn=accounts,dc=corp,dc=lan
-    user_filter: (uid=%s)
-    username_attr: uid
-    display_name_attr: displayName
-    group_base_dn: cn=groups,cn=accounts,dc=corp,dc=lan
-    groups:
-      - ldap_group: obserae-admins
-        obserae_group: admin
-      - ldap_group: obserae-analysts
-        obserae_group: analyst
-      - ldap_group: obserae-auditors
-        obserae_group: auditor
+  # NOTE — no `ldap:` block on purpose.
+  # LDAP transport settings are per-install: FreeIPA generates a fresh CA on
+  # every first boot, so a root_ca frozen in this bundle can only ever be the
+  # WRONG one, and importing it would make every LDAP sign-in fail with
+  # "x509: certificate signed by unknown authority". scripts/setup-ldap.sh owns
+  # that configuration and writes it from the CA it just exported.
+  # An absent block is a no-op on import (internal/users/yaml.go, applyLDAPTx),
+  # so this bundle can be imported at any time, before or after LDAP is set up.
 rule_sets:
   packs:
     - id: std.community

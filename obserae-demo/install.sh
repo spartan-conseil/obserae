@@ -31,6 +31,7 @@ INSTALL_URL="${INSTALL_URL:-https://demo.obserae.com}"
 CMD=""
 EXTRA_ARGS=""
 WITH_LDAP="${WITH_LDAP:-0}"
+LDAP_FAILED=0
 ASSUME_YES="${ASSUME_YES:-0}"
 NO_START=0
 DOCKER_SUDO=""
@@ -302,10 +303,19 @@ cmd_install() {
   wait_ui
   if [ "$WITH_LDAP" = "1" ]; then
     info "Provisioning FreeIPA + LDAP (first boot can take several minutes) ..."
-    ( cd "$DEMO_DIR" && $DOCKER_SUDO ./scripts/setup-ldap.sh ) \
-      || warn "setup-ldap.sh did not complete — re-run it later (README §5): (cd $DEMO_DIR && ${DOCKER_SUDO:+sudo }./scripts/setup-ldap.sh)"
+    if ! ( cd "$DEMO_DIR" && $DOCKER_SUDO ./scripts/setup-ldap.sh ); then
+      LDAP_FAILED=1
+    fi
   fi
   print_next_steps
+  # You asked for LDAP: saying "obserae demo is up" and exiting 0 with a dead
+  # directory is how a broken --with-ldap went unnoticed. The lab itself IS
+  # usable, so it stays up — but the command reports the failure.
+  if [ "$LDAP_FAILED" = "1" ]; then
+    err "LDAP provisioning FAILED — the lab is running, but LDAP sign-in will not work."
+    err "Re-run it with: (cd $DEMO_DIR && ${DOCKER_SUDO:+sudo }./scripts/setup-ldap.sh)"
+    exit 1
+  fi
 }
 
 cmd_update() {

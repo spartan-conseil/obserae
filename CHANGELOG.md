@@ -6,6 +6,108 @@ the beta. Dates are release dates. This document is published as the dedicated
 [Changelog](https://obserae.com/docs/changelog/) page on obserae.com. It is a
 bird's-eye view, not an exhaustive commit log.
 
+## [0.34.0] 2026-08-10
+
+### Added
+
+- **Use your own Threat Intelligence feeds.** Upload an IP/CIDR file or add a
+  periodically refreshed URL from the GUI, REST API or CLI. obserae supports
+  netsets, CSV/TSV, JSON/NDJSON, STIX 2.x, MISP and gzip. If an update is
+  invalid, the previous working version remains active. Authenticated feeds,
+  configuration export/restore and full backups are supported.
+
+- **Manage your organisation's vocabulary from Network → Vocabulary.** Create
+  zones, environments, host roles and service purposes in one place. The page
+  clearly distinguishes your terms from those supplied by Rule Sets and shows
+  the impact before a term is deleted.
+
+- **Create named sub-ranges within a network.** Give meaningful names to address
+  ranges such as `office.printers` or `office.test_device`, then use those names
+  in NFQL queries and Flow Matrix rules. Define them in YAML or directly from
+  the Cartography network form:
+
+  ```yaml
+  networks:
+    - name: "office"
+      cidr: "192.168.10.0/24"
+      ranges:
+        - {name: printers, start: 192.168.10.20, end: 192.168.10.29}
+        - {name: test_device, start: 192.168.10.40, end: 192.168.10.49}
+  ```
+
+  Then refer to the range by name:
+
+  ```nfql
+  FROM sessions | LAST 86400 | WHERE ip WITHIN "office.printers"
+  ```
+
+- **Export and replay flow captures.** Move raw flows between probes, reproduce
+  an incident or build reusable demonstrations with `obserae-cli flows export`
+  and `obserae-cli flows import`. Replayed traffic produces the same sessions,
+  conversations and detections as live traffic, and is immediately queryable
+  when the import finishes. Keep the original timestamps, move the capture to
+  the present, apply a custom time shift, and optionally use gzip.
+
+- **Configure the web listener in Docker through environment variables.** Use
+  `OBSERAE_WEB_ENABLED`, `OBSERAE_WEB_ADDRESS` and
+  `OBSERAE_WEB_SECURE_COOKIES` without replacing the image's configuration
+  file. This also makes trusted plain-HTTP demonstrations easier to configure.
+
+### Changed
+
+- **`WITHIN` now accepts cartography names.** You can write queries such as
+  `server_ip WITHIN "internet"`, `client_ip WITHIN "network:office"` or
+  `ip WITHIN "group:databases"`. Existing queries using `==` remain compatible.
+
+- **`internet`, `internal` and `any` cover both address families at once.**
+  Dual-stack NFQL queries no longer need separate `internet4`/`internet6` or
+  `internal4`/`internal6` clauses. The address-family-specific names remain
+  available, and `network:internet` can still target a cartography network with
+  that name.
+
+### Fixed
+
+- **Interrupted data upgrades now recover automatically.** Restart obserae and
+  it restores the previous working state before retrying the upgrade; no manual
+  restore step is required.
+
+- **LDAP sign-in now works in the demonstration lab.** The installer waits for
+  FreeIPA to be fully ready and reports a clear failure if directory setup does
+  not complete. Importing the ready-made configuration no longer breaks the
+  lab's trusted LDAP connection.
+
+- **Removing a DHCP range now removes its cartography node.** Clearing both
+  DHCP fields in a network's edit form now removes the saved pool and its node
+  from the map.
+
+- **Configuration export and restore now preserve more of your setup safely.**
+  NAT rules, network gateways, reports, output credentials and local MFA
+  factors are all retained. Secrets remain encrypted, older configuration
+  bundles remain importable, and exported files explain what each section
+  contains.
+
+- **Cloning a host now copies its role, its documentation and its services'
+  purposes.** Its interfaces, services, groups and icon continue to be copied.
+
+- **The Firefox query editor now keeps the caret and completion popup aligned
+  with the text.** This also works after tabs and on long lines.
+
+- **The rule detail panel stays on screen when you scroll the list.** On the
+  Flow Matrix and detection rules pages, the list now scrolls independently so
+  the selected rule remains visible.
+
+- **A `purpose:` reference compared against an address column no longer crashes
+  the query.** The query now returns a clear error explaining that purposes must
+  be compared with a port column.
+
+- **`WITHIN` no longer swaps its operands.** `"10.0.0.0/8" WITHIN src_addr` was
+  previously evaluated as the opposite expression; it now returns the result
+  the query asks for.
+
+- **Imported and late-arriving flows remain available.** They are stored in the
+  correct historical time window, appear in time-bounded queries and are no
+  longer lost when an older hour has already been compacted.
+
 ## [0.33.0] — 2026-08-05
 
 Two themes. **Restitution**: obserae now produces the document you hand to an

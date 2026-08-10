@@ -22,6 +22,11 @@ ADMIN_PW="ObseraeDemo123"   # FreeIPA admin / Directory Manager
 BIND_PW="bindDemo123"       # obserae read-only bind account
 USER_PW="Demo12345"         # demo end-user password
 
+# Upper bound on the FreeIPA first boot. Long, because provisioning a CA in a
+# container is slow -- but bounded, so a broken directory fails loudly instead
+# of hanging the installer forever.
+IPA_READY_TIMEOUT="${IPA_READY_TIMEOUT:-900}"
+
 BASE_DN="dc=corp,dc=lan"
 BIND_DN="uid=svc-obserae,cn=sysaccounts,cn=etc,${BASE_DN}"
 USER_BASE_DN="cn=users,cn=accounts,${BASE_DN}"
@@ -40,7 +45,21 @@ if ! docker version >/dev/null 2>&1; then
 fi
 
 echo "==> Waiting for FreeIPA to finish provisioning (first boot can take several minutes)..."
-until docker compose exec -T freeipa bash -lc "echo '${ADMIN_PW}' | kinit admin" >/dev/null 2>&1; do
+# `kinit` answers as soon as the KDC is listening -- seconds BEFORE
+# ipa-server-install finishes writing the client configuration
+# (/etc/ipa/default.conf). Waiting on it alone raced the install: the very next
+# `ipa` command died with "IPA client is not configured on this system", and the
+# whole provisioning was skipped. `ipa ping` needs the ticket AND that
+# configuration, so it is the honest readiness signal for what follows.
+_deadline=$(( $(date +%s) + IPA_READY_TIMEOUT ))
+until docker compose exec -T freeipa bash -lc \
+        "echo '${ADMIN_PW}' | kinit admin && ipa ping" >/dev/null 2>&1; do
+  if [ "$(date +%s)" -ge "$_deadline" ]; then
+    echo
+    echo "ERROR: FreeIPA is still not usable after ${IPA_READY_TIMEOUT}s." >&2
+    echo "       Look at what it is doing:  docker compose logs freeipa" >&2
+    exit 1
+  fi
   printf '.'
   sleep 10
 done
